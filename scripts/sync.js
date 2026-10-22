@@ -70,13 +70,14 @@ async function act(label, fn) {
   return fn();
 }
 
-/** Scores a finished FPL fixture with real stats and prints the top players, without touching the chain. */
+/** Scores a finished FPL fixture (an id, or "latest") with real stats and prints the top players, without touching the chain. */
 async function previewFplFixture(fixtureId) {
   const { buildMeta } = require("./feeds/fpl");
   const { RULES, computeMatchPoints } = await import("../scoring/index.mjs");
   const get = async (p) => (await fetch(`https://fantasy.premierleague.com/api${p}`)).json();
   const [boot, fixtures] = await Promise.all([get("/bootstrap-static/"), get("/fixtures/")]);
-  const fixture = fixtures.find((f) => f.id === fixtureId);
+  const finished = fixtures.filter((f) => f.finished).sort((a, b) => Date.parse(b.kickoff_time) - Date.parse(a.kickoff_time));
+  const fixture = fixtureId === "latest" ? finished[0] : fixtures.find((f) => f.id === Number(fixtureId));
   if (!fixture?.finished) throw new Error(`fixture ${fixtureId} not found or not finished`);
   const meta = buildMeta(boot, fixture);
   const { stats } = await createFplFeed().result(meta);
@@ -90,7 +91,7 @@ async function previewFplFixture(fixtureId) {
 }
 
 async function main() {
-  if (process.env.PREVIEW_FPL_FIXTURE) return previewFplFixture(Number(process.env.PREVIEW_FPL_FIXTURE));
+  if (process.env.PREVIEW_FPL_FIXTURE) return previewFplFixture(process.env.PREVIEW_FPL_FIXTURE);
   const { league } = await contracts(hre);
   const now = (await hre.ethers.provider.getBlock("latest")).timestamp;
   const feeds = { fpl: createFplFeed() };
