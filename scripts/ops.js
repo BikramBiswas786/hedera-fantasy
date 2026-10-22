@@ -67,7 +67,16 @@ async function deploy(hre, { disputeWindow }) {
 
   const data = { chainId: Number((await hre.ethers.provider.getNetwork()).chainId), fan: fan.target, league: league.target };
   const client = hederaClient(hre);
-  if (client) data.hcsTopicId = await createTopic(client, "Hedera Fantasy League - squads and match stats");
+  if (client) {
+    try {
+      data.hcsTopicId = await createTopic(client, "Hedera Fantasy League - squads and match stats");
+    } catch (e) {
+      // HCS goes over gRPC to the consensus nodes, which some networks block
+      console.warn(`Could not create HCS topic (${e.message}). Squads and stats will be bundled files instead.`);
+    } finally {
+      client.close();
+    }
+  }
   writeDeployments(hre.network.name, data);
   return data;
 }
