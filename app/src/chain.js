@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import leagueAbi from "./abi/FantasyLeague.json";
 import fanAbi from "./abi/FanToken.json";
 import deployments from "./deployments.json";
+import { GasSafeSigner } from "./gasSafeSigner.js";
 import { fetchHcsMessage } from "../../scoring/hcs.mjs";
 
 export const NETWORKS = {
@@ -63,9 +64,10 @@ export function readContracts(network) {
 
 export function writeContracts(network, signer) {
   const d = getDeployment(network);
+  const safe = new GasSafeSigner(signer, readContracts(network).provider);
   return {
-    league: new ethers.Contract(d.league, leagueAbi, signer),
-    fan: new ethers.Contract(d.fan, fanAbi, signer),
+    league: new ethers.Contract(d.league, leagueAbi, safe),
+    fan: new ethers.Contract(d.fan, fanAbi, safe),
   };
 }
 
