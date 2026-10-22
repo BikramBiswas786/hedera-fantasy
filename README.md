@@ -18,7 +18,7 @@ The [Sync matches](.github/workflows/sync-matches.yml) workflow runs every hour 
 |---|---|---|
 | Fixtures and squads | [Fantasy Premier League API](https://fantasy.premierleague.com/api/bootstrap-static/) (public) | [CricketData.org](https://cricketdata.org) (free API key) |
 | Credits | FPL prices: £4.0m is 7.0 credits, £10.0m and up is 11.0 | By role (the feed has no player ratings) |
-| Imported | Fixtures starting in the next 7 days | Same, for internationals and major T20 leagues (IPL, BBL/WBBL, PSL, CPL, SA20, The Hundred and more) |
+| Imported | Fixtures starting in the next 14 days | Same, for internationals and major T20 leagues (IPL, BBL/WBBL, PSL, CPL, SA20, The Hundred and more) |
 | Results | Per-player stats once FPL marks the fixture finished | Scorecard once the match has ended |
 | Rules | `football-epl-v1` | `cricket-t20-v1`, `cricket-odi-v1` |
 

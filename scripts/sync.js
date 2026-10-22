@@ -2,8 +2,8 @@
 //   npx hardhat run scripts/sync.js --network hederaTestnet
 // Each run:
 //   1. imports Premier League fixtures (FPL API) and international T20/ODI and major T20 league
-//      matches (CricketData, when CRICKETDATA_API_KEY is set) starting within LOOKAHEAD_DAYS that
-//      aren't on-chain yet, at most MAX_IMPORTS_PER_RUN per run
+//      matches (CricketData, when CRICKETDATA_API_KEY is set) that
+//      aren't on-chain yet (14 days ahead for football, 7 for cricket), at most MAX_IMPORTS_PER_RUN per run
 //   2. abandons matches whose fixture was postponed or produced no result (contests refund)
 //   3. posts results for finished matches, with the raw stats published to HCS
 //   4. settles contests once the dispute window has passed
@@ -18,7 +18,11 @@ const { createCricketFeed } = require("./feeds/cricketdata");
 
 // Without an operator key there is nothing to sign with, so only report what would happen.
 const DRY_RUN = process.env.DRY_RUN === "1" || (hre.network.name !== "localhost" && !process.env.HEDERA_PRIVATE_KEY);
-const LOOKAHEAD = Number(process.env.LOOKAHEAD_DAYS || 7) * 86400;
+// Football looks two gameweeks ahead; cricket a week, to stay inside the CricketData quota.
+const LOOKAHEAD = {
+  fpl: Number(process.env.FOOTBALL_LOOKAHEAD_DAYS || 14) * 86400,
+  cricketdata: Number(process.env.CRICKET_LOOKAHEAD_DAYS || 7) * 86400,
+};
 // Each import is a few transactions; later runs pick up the rest.
 const MAX_IMPORTS = Number(process.env.MAX_IMPORTS_PER_RUN || 12);
 const MIN_LEAD = 15 * 60; // don't import a match that starts within 15 minutes
@@ -114,12 +118,12 @@ async function main() {
     if (feed.provider === "cricketdata" && hour % CRICKET_LIST_EVERY_HOURS !== 0 && !process.env.FORCE_CRICKET_LIST) continue;
     let upcoming = [];
     try {
-      upcoming = await feed.upcoming(now + MIN_LEAD, now + LOOKAHEAD);
+      upcoming = await feed.upcoming(now + MIN_LEAD, now + LOOKAHEAD[feed.provider]);
     } catch (e) {
       console.warn(`${feed.provider}: could not list fixtures (${e.message})`);
       continue;
     }
-    console.log(`${feed.provider}: ${upcoming.length} fixtures in the next ${LOOKAHEAD / 86400} days`);
+    console.log(`${feed.provider}: ${upcoming.length} fixtures in the next ${LOOKAHEAD[feed.provider] / 86400} days`);
     candidates.push(...upcoming.filter(({ meta }) => !registry.keys.has(meta.source.key)));
   }
   candidates.sort((a, b) => a.startTime - b.startTime);
