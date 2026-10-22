@@ -161,7 +161,26 @@ async function checkPostponed(feed, meta) {
   return result?.abandon ? result : null;
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exitCode = 1;
-});
+// On GitHub Actions, also publish the run's log as a notice, which shows on the run page
+// and is readable through the API (unlike raw job logs).
+const lines = [];
+if (process.env.GITHUB_ACTIONS) {
+  for (const level of ["log", "warn"]) {
+    const original = console[level].bind(console);
+    console[level] = (...args) => {
+      lines.push(args.join(" "));
+      original(...args);
+    };
+  }
+}
+const escape = (s) => s.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+
+main()
+  .catch((e) => {
+    console.error(e);
+    lines.push(`ERROR: ${e.message}`);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    if (process.env.GITHUB_ACTIONS) process.stdout.write(`::notice title=Sync log::${escape(lines.join("\n").slice(-60000))}\n`);
+  });
