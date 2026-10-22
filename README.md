@@ -5,6 +5,10 @@ Users can check every step themselves instead of trusting the operator.
 
 > FAN is a testnet game token with no monetary value. This project is free-to-play only.
 
+**Live app:** https://openxi-fantasy.vercel.app (Hedera testnet). Every push to `main` redeploys it.
+
+Testnet contracts: [FantasyLeague](https://hashscan.io/testnet/contract/0x37d26A343469cDFef9116fF50f7911425aCDf14f) · [FanToken](https://hashscan.io/testnet/contract/0xd8B9252D9cb3e41ec68Eaf26F55467D20573188c) · [HCS data topic](https://hashscan.io/testnet/topic/0.0.11129616)
+
 ## What it does (Dream11 feature parity)
 
 | Dream11 | OpenXI |
@@ -78,7 +82,8 @@ MATCH_ID=1 npx hardhat run scripts/verify.js --network localhost
    ```bash
    MATCH=cricket-demo START_IN_MINUTES=120 npm run match:testnet
    ```
-5. After the match, publish stats and points. Once the dispute window has passed, settle:
+5. After the match, run `npm run testnet:finish`. It waits for each match to start, publishes stats and points,
+   waits out the dispute window, then settles every contest. Or do the steps by hand:
    ```bash
    MATCH=cricket-demo MATCH_ID=1 npm run results:testnet
    MATCH_ID=1 npm run settle:testnet
