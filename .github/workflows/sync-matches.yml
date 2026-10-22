@@ -16,7 +16,7 @@ on:
         type: boolean
         default: false
       preview_fpl_fixture:
-        description: Only score this finished FPL fixture (id or \"latest\") and print the top players
+        description: 'Only score this finished FPL fixture (an id, or "latest") and print the top players'
         default: ""
 
 concurrency: hedera-testnet

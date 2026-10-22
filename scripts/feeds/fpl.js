@@ -7,9 +7,12 @@ const UNAVAILABLE = new Set(["u", "n"]); // left the club / not eligible
 
 const kickoffUnix = (iso) => Math.floor(Date.parse(iso) / 1000);
 
-/** FPL price (in £0.1m, 40-150) mapped to 7.0-11.0 credits, in tenths, to the nearest 0.5. */
+/**
+ * FPL price (in £0.1m) mapped to credits in tenths, to the nearest 0.5: £4.0m is 7.0 and
+ * £10.0m or more is 11.0, so the 100-credit budget limits how many stars a team can have.
+ */
 function credits(nowCost) {
-  const raw = 70 + ((nowCost - 40) * 40) / 110;
+  const raw = 70 + ((nowCost - 40) * 40) / 60;
   return Math.min(110, Math.max(70, Math.round(raw / 5) * 5));
 }
 

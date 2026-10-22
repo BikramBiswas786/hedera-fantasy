@@ -12,7 +12,7 @@ function fplBootstrap() {
   for (const team of [1, 2]) {
     for (const [type, count] of [[1, 2], [2, 6], [3, 6], [4, 3]]) {
       for (let k = 0; k < count; k++) {
-        elements.push({ id: id++, team, element_type: type, web_name: `P${id}`, now_cost: 45 + ((id * 7) % 90), status: "a" });
+        elements.push({ id: id++, team, element_type: type, web_name: `P${id}`, now_cost: 40 + ((id * 7) % 70), status: "a" });
       }
     }
   }
@@ -29,8 +29,9 @@ function fplBootstrap() {
 describe("FPL feed", () => {
   it("maps prices to 7.0-11.0 credits in half steps", () => {
     expect(fpl.credits(40)).to.equal(70);
+    expect(fpl.credits(70)).to.equal(90);
+    expect(fpl.credits(100)).to.equal(110);
     expect(fpl.credits(150)).to.equal(110);
-    expect(fpl.credits(95)).to.equal(90);
     expect(fpl.credits(20)).to.equal(70);
     for (let c = 40; c <= 150; c++) expect(fpl.credits(c) % 5).to.equal(0);
   });

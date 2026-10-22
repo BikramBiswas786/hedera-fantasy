@@ -32,6 +32,8 @@ function autoPickTeam(players, sport, variant = 0) {
     const picks = [];
     TEAM_SHAPE[sport].forEach((count, role) => {
       const pool = players.map((p, i) => ({ ...p, i })).filter((p) => Number(p.role) === role);
+      // after the spread-out attempts, fall back to the cheapest players so the budget fits
+      if (attempt >= 25) pool.sort((a, b) => Number(a.credits) - Number(b.credits) || a.i - b.i);
       for (let k = 0; k < count; k++) picks.push(pool[(offset + k * 2) % pool.length].i);
     });
     const unique = new Set(picks).size === 11;
