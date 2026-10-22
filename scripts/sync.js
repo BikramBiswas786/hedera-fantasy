@@ -15,7 +15,8 @@ const { contracts, createMatchFromMeta, postResultsFromStats, settleMatch, loadR
 const { createFplFeed } = require("./feeds/fpl");
 const { createCricketFeed } = require("./feeds/cricketdata");
 
-const DRY_RUN = process.env.DRY_RUN === "1";
+// Without an operator key there is nothing to sign with, so only report what would happen.
+const DRY_RUN = process.env.DRY_RUN === "1" || (hre.network.name !== "localhost" && !process.env.HEDERA_PRIVATE_KEY);
 const LOOKAHEAD = Number(process.env.LOOKAHEAD_DAYS || 3) * 86400;
 const MIN_LEAD = 15 * 60; // don't import a match that starts within 15 minutes
 const CACHE_FILE = path.join(ROOT, ".cache", "metadata.json");
@@ -78,6 +79,7 @@ async function main() {
   else console.log("CRICKETDATA_API_KEY not set: skipping international cricket");
 
   console.log(`Sync at ${new Date(now * 1000).toISOString()}${DRY_RUN ? " (dry run)" : ""}`);
+  if (DRY_RUN && process.env.DRY_RUN !== "1") console.log("HEDERA_PRIVATE_KEY is not set, so this is a dry run. Add it as a repo secret to go live.");
   const registry = await loadRegistry(league);
   console.log(`${registry.matches.length} matches on-chain`);
 
