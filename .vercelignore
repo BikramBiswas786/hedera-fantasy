@@ -1,0 +1,10 @@
+# Upload only what the web app needs. Never upload .env (it holds the private key).
+/*
+!/app
+!/scoring
+!/data
+!/vercel.json
+/app/node_modules
+/app/dist
+.env
+.env.*

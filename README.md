@@ -113,3 +113,12 @@ into these two files, then run the same scripts.
   through WalletConnect.
 - **Legal.** Keep this free-to-play. India's Promotion and Regulation of Online Gaming Act, 2025 bans real-money
   online games, including paid fantasy sports. Check the law in each country before adding anything of value.
+
+## Host the web app on Vercel
+
+`vercel.json` builds the app in `app/`, and `.vercelignore` uploads only `app/`, `scoring/` and `data/`, never `.env`.
+
+```bash
+npx vercel login
+npx vercel --prod
+```
