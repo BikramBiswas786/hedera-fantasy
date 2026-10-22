@@ -1,0 +1,195 @@
+{
+  "sport": "football",
+  "rulesId": "football-v1",
+  "name": "KOL vs MAD - League (demo)",
+  "teams": [
+    "Kolkata Tigers FC",
+    "Madrid Royals FC"
+  ],
+  "short": [
+    "KOL",
+    "MAD"
+  ],
+  "players": [
+    {
+      "name": "Ishan Joshi",
+      "side": 0,
+      "role": 0,
+      "credits": 110
+    },
+    {
+      "name": "Aditya Walker",
+      "side": 0,
+      "role": 0,
+      "credits": 90
+    },
+    {
+      "name": "Rahul Price",
+      "side": 0,
+      "role": 1,
+      "credits": 95
+    },
+    {
+      "name": "Sameer Molina",
+      "side": 0,
+      "role": 1,
+      "credits": 75
+    },
+    {
+      "name": "Nikhil Rao",
+      "side": 0,
+      "role": 1,
+      "credits": 95
+    },
+    {
+      "name": "Yash Das",
+      "side": 0,
+      "role": 1,
+      "credits": 100
+    },
+    {
+      "name": "Karan Morgan",
+      "side": 0,
+      "role": 1,
+      "credits": 90
+    },
+    {
+      "name": "Manav Gray",
+      "side": 0,
+      "role": 2,
+      "credits": 80
+    },
+    {
+      "name": "Liam Santos",
+      "side": 0,
+      "role": 2,
+      "credits": 85
+    },
+    {
+      "name": "Jack Nair",
+      "side": 0,
+      "role": 2,
+      "credits": 110
+    },
+    {
+      "name": "Noah Reddy",
+      "side": 0,
+      "role": 2,
+      "credits": 105
+    },
+    {
+      "name": "Oliver Brooks",
+      "side": 0,
+      "role": 2,
+      "credits": 110
+    },
+    {
+      "name": "Ethan Ruiz",
+      "side": 0,
+      "role": 3,
+      "credits": 110
+    },
+    {
+      "name": "Mason Mehta",
+      "side": 0,
+      "role": 3,
+      "credits": 80
+    },
+    {
+      "name": "Lucas Singh",
+      "side": 0,
+      "role": 3,
+      "credits": 100
+    },
+    {
+      "name": "Ryan Clarke",
+      "side": 1,
+      "role": 0,
+      "credits": 105
+    },
+    {
+      "name": "Owen Reed",
+      "side": 1,
+      "role": 0,
+      "credits": 95
+    },
+    {
+      "name": "Caleb Vega",
+      "side": 1,
+      "role": 1,
+      "credits": 100
+    },
+    {
+      "name": "Leo Kapoor",
+      "side": 1,
+      "role": 1,
+      "credits": 95
+    },
+    {
+      "name": "Max Gill",
+      "side": 1,
+      "role": 1,
+      "credits": 75
+    },
+    {
+      "name": "Finn Turner",
+      "side": 1,
+      "role": 1,
+      "credits": 110
+    },
+    {
+      "name": "Mateo Ortega",
+      "side": 1,
+      "role": 1,
+      "credits": 100
+    },
+    {
+      "name": "Diego Sharma",
+      "side": 1,
+      "role": 2,
+      "credits": 105
+    },
+    {
+      "name": "Pablo Patel",
+      "side": 1,
+      "role": 2,
+      "credits": 105
+    },
+    {
+      "name": "Sergio Hughes",
+      "side": 1,
+      "role": 2,
+      "credits": 110
+    },
+    {
+      "name": "Marco Ward",
+      "side": 1,
+      "role": 2,
+      "credits": 100
+    },
+    {
+      "name": "Hugo Castro",
+      "side": 1,
+      "role": 2,
+      "credits": 80
+    },
+    {
+      "name": "Arjun Iyer",
+      "side": 1,
+      "role": 3,
+      "credits": 70
+    },
+    {
+      "name": "Rohan Bose",
+      "side": 1,
+      "role": 3,
+      "credits": 80
+    },
+    {
+      "name": "Vikram Hayes",
+      "side": 1,
+      "role": 3,
+      "credits": 95
+    }
+  ]
+}

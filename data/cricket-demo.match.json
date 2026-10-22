@@ -1,0 +1,171 @@
+{
+  "sport": "cricket",
+  "rulesId": "cricket-t20-v1",
+  "name": "MUM vs SYD - T20 (demo)",
+  "teams": [
+    "Mumbai Mavericks",
+    "Sydney Strikers"
+  ],
+  "short": [
+    "MUM",
+    "SYD"
+  ],
+  "players": [
+    {
+      "name": "Arjun Iyer",
+      "side": 0,
+      "role": 0,
+      "credits": 105
+    },
+    {
+      "name": "Rohan Bose",
+      "side": 0,
+      "role": 0,
+      "credits": 80
+    },
+    {
+      "name": "Vikram Hayes",
+      "side": 0,
+      "role": 1,
+      "credits": 80
+    },
+    {
+      "name": "Kabir Navarro",
+      "side": 0,
+      "role": 1,
+      "credits": 80
+    },
+    {
+      "name": "Dev Rojas",
+      "side": 0,
+      "role": 1,
+      "credits": 110
+    },
+    {
+      "name": "Ishan Joshi",
+      "side": 0,
+      "role": 1,
+      "credits": 80
+    },
+    {
+      "name": "Aditya Walker",
+      "side": 0,
+      "role": 2,
+      "credits": 110
+    },
+    {
+      "name": "Rahul Price",
+      "side": 0,
+      "role": 2,
+      "credits": 75
+    },
+    {
+      "name": "Sameer Molina",
+      "side": 0,
+      "role": 2,
+      "credits": 100
+    },
+    {
+      "name": "Nikhil Rao",
+      "side": 0,
+      "role": 3,
+      "credits": 80
+    },
+    {
+      "name": "Yash Das",
+      "side": 0,
+      "role": 3,
+      "credits": 70
+    },
+    {
+      "name": "Karan Morgan",
+      "side": 0,
+      "role": 3,
+      "credits": 70
+    },
+    {
+      "name": "Manav Gray",
+      "side": 0,
+      "role": 3,
+      "credits": 85
+    },
+    {
+      "name": "Mateo Ortega",
+      "side": 1,
+      "role": 0,
+      "credits": 105
+    },
+    {
+      "name": "Diego Sharma",
+      "side": 1,
+      "role": 0,
+      "credits": 70
+    },
+    {
+      "name": "Pablo Patel",
+      "side": 1,
+      "role": 1,
+      "credits": 105
+    },
+    {
+      "name": "Sergio Hughes",
+      "side": 1,
+      "role": 1,
+      "credits": 105
+    },
+    {
+      "name": "Marco Ward",
+      "side": 1,
+      "role": 1,
+      "credits": 90
+    },
+    {
+      "name": "Hugo Castro",
+      "side": 1,
+      "role": 1,
+      "credits": 90
+    },
+    {
+      "name": "Arjun Iyer",
+      "side": 1,
+      "role": 2,
+      "credits": 90
+    },
+    {
+      "name": "Rohan Bose",
+      "side": 1,
+      "role": 2,
+      "credits": 75
+    },
+    {
+      "name": "Vikram Hayes",
+      "side": 1,
+      "role": 2,
+      "credits": 80
+    },
+    {
+      "name": "Kabir Navarro",
+      "side": 1,
+      "role": 3,
+      "credits": 90
+    },
+    {
+      "name": "Dev Rojas",
+      "side": 1,
+      "role": 3,
+      "credits": 100
+    },
+    {
+      "name": "Ishan Joshi",
+      "side": 1,
+      "role": 3,
+      "credits": 105
+    },
+    {
+      "name": "Aditya Walker",
+      "side": 1,
+      "role": 3,
+      "credits": 90
+    }
+  ]
+}

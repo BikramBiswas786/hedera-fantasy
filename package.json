@@ -1,0 +1,31 @@
+{
+  "name": "hedera-fantasy",
+  "version": "1.0.0",
+  "description": "Transparent Dream11-style fantasy cricket and football on Hedera",
+  "scripts": {
+    "compile": "hardhat compile && node scripts/export-abi.js",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "demo:local": "hardhat run scripts/local-demo.js --network localhost",
+    "demo:finish": "hardhat run scripts/simulate-match.js --network localhost",
+    "deploy:testnet": "hardhat run scripts/deploy.js --network hederaTestnet",
+    "match:testnet": "hardhat run scripts/create-match.js --network hederaTestnet",
+    "results:testnet": "hardhat run scripts/post-results.js --network hederaTestnet",
+    "settle:testnet": "hardhat run scripts/settle.js --network hederaTestnet",
+    "verify:testnet": "hardhat run scripts/verify.js --network hederaTestnet",
+    "app": "cd app && npm run dev"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.29.1",
+    "solc": "^0.8.24"
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "^2.81.0"
+  }
+}
