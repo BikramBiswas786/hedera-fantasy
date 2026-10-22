@@ -13,7 +13,8 @@
     "results:testnet": "hardhat run scripts/post-results.js --network hederaTestnet",
     "settle:testnet": "hardhat run scripts/settle.js --network hederaTestnet",
     "verify:testnet": "hardhat run scripts/verify.js --network hederaTestnet",
-    "app": "cd app && npm run dev"
+    "app": "cd app && npm run dev",
+    "testnet:all": "hardhat run scripts/testnet-all.js --network hederaTestnet"
   },
   "keywords": [],
   "author": "",
