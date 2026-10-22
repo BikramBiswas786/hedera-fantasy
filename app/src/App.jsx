@@ -14,6 +14,8 @@ import {
 import MatchList from "./components/MatchList.jsx";
 import MatchView from "./components/MatchView.jsx";
 
+const IS_LOCAL_HOST = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
 const defaultNetwork = () => {
   const saved = (() => {
     try {
@@ -22,7 +24,7 @@ const defaultNetwork = () => {
       return null;
     }
   })();
-  if (saved && getDeployment(saved)) return saved;
+  if (saved && getDeployment(saved) && (saved !== "localhost" || IS_LOCAL_HOST)) return saved;
   return getDeployment("hederaTestnet") ? "hederaTestnet" : "localhost";
 };
 
@@ -110,7 +112,9 @@ export default function App() {
         </button>
         <div className="wallet">
           <select value={network} onChange={(e) => switchNetwork(e.target.value)} aria-label="Network">
-            {Object.entries(NETWORKS).map(([k, n]) => (
+            {Object.entries(NETWORKS)
+              .filter(([k]) => getDeployment(k) && (k !== "localhost" || IS_LOCAL_HOST))
+              .map(([k, n]) => (
               <option key={k} value={k}>
                 {n.label}
               </option>
@@ -146,7 +150,7 @@ export default function App() {
       {busy && <div className="busy">{busy}… waiting for confirmation</div>}
       {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
 
-      <main>
+      <main key={network}>
         {!deployed ? (
           <div className="empty">
             <h2>Not deployed on {NETWORKS[network].label}</h2>

@@ -10,6 +10,8 @@ export default function MatchList({ ctx, open }) {
   useTicker();
 
   useEffect(() => {
+    let cancelled = false;
+    setError(null);
     (async () => {
       const { league } = ctx.read;
       const [count, disputeWindow] = await Promise.all([league.matchCount(), league.disputeWindow()]);
@@ -23,8 +25,11 @@ export default function MatchList({ ctx, open }) {
           return { id, m, meta, contests: contests.length, prize, disputeWindow: Number(disputeWindow) };
         }),
       );
-      setMatches(list);
-    })().catch(setError);
+      if (!cancelled) setMatches(list);
+    })().catch((e) => !cancelled && setError(e));
+    return () => {
+      cancelled = true;
+    };
   }, [ctx.read, ctx.version]);
 
   if (error) return <div className="empty">Could not load matches: {String(error.message || error)}</div>;
