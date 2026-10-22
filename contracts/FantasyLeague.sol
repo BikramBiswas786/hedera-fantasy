@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -16,9 +14,9 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 ///           so anyone can recompute them with the open-source scoring code
 ///         - team scores are computed by the contract, and settlement verifies the submitted
 ///           ranking, so nobody (including the operator) can change who wins
+///         Entry fees, sponsored pools and prizes are paid in the native coin (HBAR on Hedera).
+///         Inside the Hedera EVM, msg.value and all amounts here are in tinybars (1 HBAR = 1e8).
 contract FantasyLeague is AccessControl, ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
 
@@ -103,7 +101,6 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         uint256 teamId;
     }
 
-    IERC20 public immutable fan;
     address public treasury;
     uint64 public disputeWindow;
 
@@ -137,8 +134,7 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
     event ContestCancelled(uint256 indexed contestId);
     event Claimed(address indexed user, uint256 amount);
 
-    constructor(IERC20 fan_, address treasury_, uint64 disputeWindow_) {
-        fan = fan_;
+    constructor(address treasury_, uint64 disputeWindow_) {
         treasury = treasury_;
         disputeWindow = disputeWindow_;
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -303,7 +299,8 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
     // Contests
     // ---------------------------------------------------------------------
 
-    function createContest(ContestParams calldata p) external onlyRole(OPERATOR_ROLE) returns (uint256 contestId) {
+    /// @notice Create a contest. The operator funds `sponsoredPool` by sending exactly that much HBAR.
+    function createContest(ContestParams calldata p) external payable onlyRole(OPERATOR_ROLE) returns (uint256 contestId) {
         Match storage m = _matches[p.matchId];
         require(m.startTime != 0 && m.status == MatchStatus.Scheduled, "Contest: bad match");
         require(block.timestamp < m.startTime, "Contest: match started");
@@ -319,7 +316,7 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         }
         require(total == BPS, "Contest: prizes must sum to 100%");
 
-        if (p.sponsoredPool > 0) fan.safeTransferFrom(msg.sender, address(this), p.sponsoredPool);
+        require(msg.value == p.sponsoredPool, "Contest: send sponsored pool");
 
         contestId = ++contestCount;
         Contest storage c = _contests[contestId];
@@ -336,7 +333,8 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         emit ContestCreated(contestId, p.matchId, p.entryFee, p.sponsoredPool, p.maxEntries, p.prizeBps);
     }
 
-    function joinContest(uint256 contestId, uint256 teamId) external nonReentrant {
+    /// @notice Join a contest by sending exactly the entry fee in HBAR (0 for free contests).
+    function joinContest(uint256 contestId, uint256 teamId) external payable nonReentrant {
         Contest storage c = _contests[contestId];
         Team storage t = _teams[teamId];
         Match storage m = _matches[c.matchId];
@@ -351,7 +349,7 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         teamInContest[contestId][teamId] = true;
         userEntryCount[contestId][msg.sender]++;
         _entries[contestId].push(Entry(msg.sender, teamId));
-        if (c.entryFee > 0) fan.safeTransferFrom(msg.sender, address(this), c.entryFee);
+        require(msg.value == c.entryFee, "Join: wrong entry fee");
         emit ContestJoined(contestId, _entries[contestId].length - 1, msg.sender, teamId);
     }
 
@@ -440,7 +438,8 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         uint256 amount = claimable[msg.sender];
         require(amount > 0, "Claim: nothing to claim");
         claimable[msg.sender] = 0;
-        fan.safeTransfer(msg.sender, amount);
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        require(ok, "Claim: transfer failed");
         emit Claimed(msg.sender, amount);
     }
 

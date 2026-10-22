@@ -48,9 +48,9 @@ function readDeployments() {
   return fs.existsSync(DEPLOYMENTS) ? JSON.parse(fs.readFileSync(DEPLOYMENTS, "utf8")) : {};
 }
 
-function writeDeployments(network, data) {
+function writeDeployments(network, data, { replace = false } = {}) {
   const all = readDeployments();
-  all[network] = { ...(all[network] || {}), ...data };
+  all[network] = replace ? data : { ...(all[network] || {}), ...data };
   fs.writeFileSync(DEPLOYMENTS, JSON.stringify(all, null, 2) + "\n");
   // the web app reads the same file
   const appCopy = path.join(ROOT, "app", "src", "deployments.json");

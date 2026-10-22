@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   NETWORKS,
+  coinOf,
   DEV_KEYS,
   getDeployment,
   readContracts,
   writeContracts,
   connectInjected,
   devSigner,
-  fmtFan,
   shortAddr,
   errorMessage,
 } from "./chain.js";
@@ -41,6 +41,7 @@ export default function App() {
   const [version, setVersion] = useState(0); // bump to reload data
 
   const deployed = !!getDeployment(network);
+  const coin = coinOf(network);
   const read = useMemo(() => (deployed ? readContracts(network) : null), [network, deployed]);
   const write = useMemo(() => (signer && deployed ? writeContracts(network, signer) : null), [network, signer, deployed]);
 
@@ -50,7 +51,7 @@ export default function App() {
     if (!read) return;
     read.provider.getBlock("latest").then((b) => setChainOffset(b.timestamp - Math.floor(Date.now() / 1000))).catch(() => {});
     if (!account) return;
-    read.fan.balanceOf(account).then(setBalance).catch(() => {});
+    read.provider.getBalance(account).then(setBalance).catch(() => {});
     read.league.claimable(account).then(setClaimable).catch(() => {});
   }, [read, account, version]);
 
@@ -98,7 +99,7 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  const ctx = { network, read, write, account, tx, refresh, version, chainNow: () => Math.floor(Date.now() / 1000) + chainOffset };
+  const ctx = { network, coin, read, write, account, tx, refresh, version, chainNow: () => Math.floor(Date.now() / 1000) + chainOffset };
 
   return (
     <div className="app">
@@ -122,15 +123,17 @@ export default function App() {
           </select>
           {account ? (
             <>
-              <span className="chip">{fmtFan(balance)} FAN</span>
+              <span className="chip">{coin.formatBalance(balance)}</span>
               {claimable > 0n && (
                 <button className="btn win" disabled={!!busy} onClick={() => tx("Claim winnings", (w) => w.league.claim())}>
-                  Claim {fmtFan(claimable)} FAN
+                  Claim {coin.format(claimable)}
                 </button>
               )}
-              <button className="btn ghost" disabled={!!busy} onClick={() => tx("Faucet", (w) => w.fan.claimFaucet())}>
-                Get free FAN
-              </button>
+              {NETWORKS[network].faucet && (
+                <a className="btn ghost" href={NETWORKS[network].faucet} target="_blank" rel="noreferrer">
+                  Get testnet HBAR
+                </a>
+              )}
               <span className="chip addr" title={account}>
                 {shortAddr(account)}
               </span>
@@ -166,8 +169,8 @@ export default function App() {
       </main>
 
       <footer>
-        Free-to-play. FAN is a testnet game token with no monetary value. Every rule, team, score and payout is on-chain
-        and can be verified.
+        Testnet only: entry fees and prizes are testnet HBAR, which has no monetary value. Every rule, team, score and
+        payout is on-chain and can be verified.
       </footer>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { fmtFan, shortAddr, computePrizes } from "../chain.js";
+import { shortAddr, computePrizes } from "../chain.js";
 import { contestKind, contestPool, sameAddr } from "../data.js";
 import TeamPreview from "./TeamPreview.jsx";
 import { fmtScore } from "./score.js";
@@ -58,7 +58,7 @@ export default function Leaderboard({ ctx, data, contestId, setContestId }) {
                   </td>
                   <td className="link">#{Number(r.e.teamId)}</td>
                   <td className="right">{r.score !== undefined ? fmtScore(r.score) : "–"}</td>
-                  <td className="right">{r.prize ? `${fmtFan(r.prize)} FAN` : "–"}</td>
+                  <td className="right">{r.prize ? ctx.coin.format(r.prize) : "–"}</td>
                 </tr>
               );
             })}

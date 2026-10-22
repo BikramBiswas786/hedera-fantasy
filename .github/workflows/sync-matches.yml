@@ -1,0 +1,46 @@
+# Imports upcoming Premier League and international cricket fixtures, posts results for
+# finished matches and settles contests. Runs hourly; can also be run from the Actions tab.
+name: Sync matches
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Only log what would happen
+        type: boolean
+        default: false
+      force_cricket_list:
+        description: Refresh the cricket fixture list now (uses CricketData requests)
+        type: boolean
+        default: false
+
+concurrency: hedera-testnet
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx hardhat compile
+      # Match metadata already read from HCS, so each run doesn't re-download it
+      - uses: actions/cache@v4
+        with:
+          path: .cache
+          key: sync-cache-${{ github.run_id }}
+          restore-keys: sync-cache-
+      - name: Sync
+        run: npx hardhat run scripts/sync.js --network hederaTestnet
+        env:
+          HEDERA_ACCOUNT_ID: ${{ secrets.HEDERA_ACCOUNT_ID }}
+          HEDERA_PRIVATE_KEY: ${{ secrets.HEDERA_PRIVATE_KEY }}
+          CRICKETDATA_API_KEY: ${{ secrets.CRICKETDATA_API_KEY }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+          FORCE_CRICKET_LIST: ${{ inputs.force_cricket_list && '1' || '' }}

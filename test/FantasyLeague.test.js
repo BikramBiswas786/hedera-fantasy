@@ -7,7 +7,7 @@ const E = (n) => ethers.parseEther(String(n));
 const DISPUTE = 3600;
 
 describe("FantasyLeague", function () {
-  let fan, league, admin, alice, bob, carol, treasury;
+  let league, admin, alice, bob, carol, treasury;
 
   async function setupMatch(id = "cricket-demo") {
     const { meta, stats } = loadMatchData(id);
@@ -24,18 +24,25 @@ describe("FantasyLeague", function () {
   }
 
   async function contest(matchId, overrides = {}) {
-    await league.createContest({
+    const params = {
       matchId,
       entryFee: E(10),
-      sponsoredPool: 0,
+      sponsoredPool: 0n,
       maxEntries: 100,
       minEntries: 2,
       maxEntriesPerUser: 3,
       platformFeeBps: 0,
       prizeBps: [6000, 3000, 1000],
       ...overrides,
-    });
+    };
+    await league.createContest(params, { value: params.sponsoredPool });
     return league.contestCount();
+  }
+
+  /** Join a contest, paying its entry fee in the native coin. */
+  async function join(user, contestId, teamId) {
+    const { entryFee } = await league.getContest(contestId);
+    return league.connect(user).joinContest(contestId, teamId, { value: entryFee });
   }
 
   async function team(user, matchId, players, sport, variant) {
@@ -59,21 +66,7 @@ describe("FantasyLeague", function () {
 
   beforeEach(async () => {
     [admin, alice, bob, carol, treasury] = await ethers.getSigners();
-    fan = await (await ethers.getContractFactory("FanToken")).deploy();
-    league = await (await ethers.getContractFactory("FantasyLeague")).deploy(fan.target, treasury.address, DISPUTE);
-    for (const u of [alice, bob, carol]) {
-      await fan.connect(u).claimFaucet();
-      await fan.connect(u).approve(league.target, ethers.MaxUint256);
-    }
-  });
-
-  describe("faucet", () => {
-    it("enforces the cooldown", async () => {
-      await expect(fan.connect(alice).claimFaucet()).to.be.revertedWith("Faucet: cooldown");
-      await time.increase(86400);
-      await fan.connect(alice).claimFaucet();
-      expect(await fan.balanceOf(alice)).to.equal(E(2000));
-    });
+    league = await (await ethers.getContractFactory("FantasyLeague")).deploy(treasury.address, DISPUTE);
   });
 
   describe("team rules", () => {
@@ -156,12 +149,12 @@ describe("FantasyLeague", function () {
       const ta = await team(alice, matchId, meta.players, "cricket", 0);
       const tb = await team(bob, matchId, meta.players, "cricket", 3);
       const tc = await team(carol, matchId, meta.players, "cricket", 6);
-      await league.connect(alice).joinContest(cId, ta.id);
-      await league.connect(bob).joinContest(cId, tb.id);
-      await league.connect(carol).joinContest(cId, tc.id);
+      await join(alice, cId, ta.id);
+      await join(bob, cId, tb.id);
+      await join(carol, cId, tc.id);
 
-      await expect(league.connect(alice).joinContest(cId, ta.id)).to.be.revertedWith("Join: team already joined");
-      await expect(league.connect(bob).joinContest(cId, ta.id)).to.be.revertedWith("Join: not your team");
+      await expect(join(alice, cId, ta.id)).to.be.revertedWith("Join: team already joined");
+      await expect(join(bob, cId, ta.id)).to.be.revertedWith("Join: not your team");
 
       await time.increase(7200);
       const points = await postResults(matchId, meta, stats);
@@ -189,13 +182,25 @@ describe("FantasyLeague", function () {
       await expect(postResults(matchId, meta, stats)).to.be.revertedWith("Match: already settled");
     });
 
+    it("requires the exact entry fee and sponsored pool", async () => {
+      const cId = await contest(matchId);
+      const ta = await team(alice, matchId, meta.players, "cricket", 0);
+      await expect(league.connect(alice).joinContest(cId, ta.id)).to.be.revertedWith("Join: wrong entry fee");
+      await expect(league.connect(alice).joinContest(cId, ta.id, { value: E(11) })).to.be.revertedWith("Join: wrong entry fee");
+      await expect(join(alice, cId, ta.id)).to.changeEtherBalances([alice, league], [-E(10), E(10)]);
+
+      const params = { matchId, entryFee: 0, sponsoredPool: E(5), maxEntries: 10, minEntries: 2, maxEntriesPerUser: 1, platformFeeBps: 0, prizeBps: [10000] };
+      await expect(league.createContest(params)).to.be.revertedWith("Contest: send sponsored pool");
+      await expect(league.connect(alice).createContest(params, { value: E(5) })).to.be.reverted; // operators only
+    });
+
     it("splits prizes between tied entries", async () => {
       const cId = await contest(matchId, { prizeBps: [7000, 3000] });
       const t = autoPickTeam(meta.players, "cricket", 0);
       await league.connect(alice).createTeam(matchId, t.picks, t.captain, t.viceCaptain);
-      await league.connect(alice).joinContest(cId, await league.teamCount());
+      await join(alice, cId, await league.teamCount());
       await league.connect(bob).createTeam(matchId, t.picks, t.captain, t.viceCaptain);
-      await league.connect(bob).joinContest(cId, await league.teamCount());
+      await join(bob, cId, await league.teamCount());
       await time.increase(7200);
       await postResults(matchId, meta, stats);
       await time.increase(DISPUTE);
@@ -215,34 +220,30 @@ describe("FantasyLeague", function () {
     it("refunds an under-filled contest", async () => {
       const cId = await contest(matchId, { minEntries: 3 });
       const ta = await team(alice, matchId, meta.players, "cricket", 0);
-      await league.connect(alice).joinContest(cId, ta.id);
+      await join(alice, cId, ta.id);
       await expect(league.cancelContest(cId)).to.be.revertedWith("Cancel: not allowed");
       await time.increase(7200);
       await league.cancelContest(cId);
       expect(await league.claimable(alice)).to.equal(E(10));
-      await league.connect(alice).claim();
-      expect(await fan.balanceOf(alice)).to.equal(E(1000));
+      await expect(league.connect(alice).claim()).to.changeEtherBalance(alice, E(10));
+      await expect(league.connect(alice).claim()).to.be.revertedWith("Claim: nothing to claim");
     });
 
     it("refunds entries and sponsor when a match is abandoned", async () => {
-      await fan.mint(admin.address, E(500));
-      await fan.approve(league.target, E(500));
       const cId = await contest(matchId, { sponsoredPool: E(500), entryFee: 0 });
       const ta = await team(alice, matchId, meta.players, "cricket", 0);
-      await league.connect(alice).joinContest(cId, ta.id);
+      await join(alice, cId, ta.id);
       await league.abandonMatch(matchId);
       await league.cancelContest(cId);
       expect(await league.claimable(admin.address)).to.equal(E(500));
     });
 
     it("pays a sponsored free contest and the platform fee", async () => {
-      await fan.mint(admin.address, E(1000));
-      await fan.approve(league.target, E(1000));
       const cId = await contest(matchId, { sponsoredPool: E(1000), entryFee: E(10), platformFeeBps: 1000, prizeBps: [10000] });
       const ta = await team(alice, matchId, meta.players, "cricket", 0);
       const tb = await team(bob, matchId, meta.players, "cricket", 3);
-      await league.connect(alice).joinContest(cId, ta.id);
-      await league.connect(bob).joinContest(cId, tb.id);
+      await join(alice, cId, ta.id);
+      await join(bob, cId, tb.id);
       await time.increase(7200);
       await postResults(matchId, meta, stats);
       await time.increase(DISPUTE);

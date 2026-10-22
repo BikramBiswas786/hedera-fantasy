@@ -6,3 +6,5 @@ coverage/
 .env
 app/dist/
 .vercel
+data/live/
+.cache/

@@ -1,0 +1,40 @@
+# Deploys FantasyLeague to Hedera testnet and commits the new address, which also
+# redeploys the web app on Vercel. Run it from the Actions tab.
+name: Deploy to Hedera testnet
+
+on:
+  workflow_dispatch:
+    inputs:
+      dispute_window:
+        description: Seconds results can be corrected before payouts
+        default: "600"
+
+permissions:
+  contents: write
+
+concurrency: hedera-testnet
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx hardhat compile
+      - name: Deploy
+        run: npx hardhat run scripts/deploy.js --network hederaTestnet
+        env:
+          HEDERA_ACCOUNT_ID: ${{ secrets.HEDERA_ACCOUNT_ID }}
+          HEDERA_PRIVATE_KEY: ${{ secrets.HEDERA_PRIVATE_KEY }}
+          DISPUTE_WINDOW: ${{ inputs.dispute_window }}
+      - name: Commit the new deployment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add deployments.json app/src/deployments.json
+          git commit -m "Deploy FantasyLeague to Hedera testnet"
+          git push

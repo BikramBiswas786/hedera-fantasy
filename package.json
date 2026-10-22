@@ -15,7 +15,8 @@
     "verify:testnet": "hardhat run scripts/verify.js --network hederaTestnet",
     "app": "cd app && npm run dev",
     "testnet:all": "hardhat run scripts/testnet-all.js --network hederaTestnet",
-    "testnet:finish": "hardhat run scripts/finish-matches.js --network hederaTestnet"
+    "testnet:finish": "hardhat run scripts/finish-matches.js --network hederaTestnet",
+    "sync": "hardhat run scripts/sync.js --network hederaTestnet"
   },
   "keywords": [],
   "author": "",

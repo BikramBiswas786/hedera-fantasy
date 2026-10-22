@@ -130,9 +130,9 @@ export default function Transparency({ ctx, data, matchId }) {
         <h3>Verify it yourself</h3>
         <p className="small">Contracts on {NETWORKS[ctx.network].label}:</p>
         <ul className="small">
-          {["league", "fan"].map((k) => (
+          {["league"].map((k) => (
             <li key={k}>
-              {k === "league" ? "FantasyLeague" : "FanToken"}:{" "}
+              FantasyLeague:{" "}
               {explorer ? (
                 <a href={`${explorer}/contract/${deployment[k]}`} target="_blank" rel="noreferrer">
                   {deployment[k]}

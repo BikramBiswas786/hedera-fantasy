@@ -3,7 +3,21 @@ const fs = require("fs");
 const path = require("path");
 const { ROOT, SPORT, scoring, loadMatchData, hashJSON, rulesHash, readDeployments, writeDeployments } = require("./lib");
 
-const E = (hre, n) => hre.ethers.parseEther(String(n));
+/**
+ * Native-coin units. Contract amounts are in the EVM's native unit: tinybars on Hedera
+ * (8 decimals), wei on local chains (18 decimals). Transaction `value` always goes in
+ * 18-decimal units, so on Hedera it is the tinybar amount times 10^10.
+ */
+function units(hre) {
+  const hedera = hre.network.name.startsWith("hedera");
+  const decimals = hedera ? 8 : 18;
+  return {
+    symbol: hedera ? "HBAR" : "ETH",
+    parse: (amount) => hre.ethers.parseUnits(String(amount), decimals),
+    format: (amount) => hre.ethers.formatUnits(amount, decimals),
+    txValue: (amount) => (hedera ? BigInt(amount) * 10n ** 10n : BigInt(amount)),
+  };
+}
 
 // ---------------------------------------------------------------------------
 // HCS publishing (only on Hedera networks with HEDERA_ACCOUNT_ID / HEDERA_PRIVATE_KEY set)
@@ -52,20 +66,15 @@ async function loadRef(ref) {
 async function contracts(hre) {
   const d = readDeployments()[hre.network.name];
   if (!d?.league) throw new Error(`no deployment for ${hre.network.name}; run deploy first`);
-  return {
-    fan: await hre.ethers.getContractAt("FanToken", d.fan),
-    league: await hre.ethers.getContractAt("FantasyLeague", d.league),
-  };
+  return { league: await hre.ethers.getContractAt("FantasyLeague", d.league) };
 }
 
 async function deploy(hre, { disputeWindow }) {
   const [deployer] = await hre.ethers.getSigners();
-  const fan = await (await hre.ethers.getContractFactory("FanToken")).deploy();
-  await fan.waitForDeployment();
-  const league = await (await hre.ethers.getContractFactory("FantasyLeague")).deploy(fan.target, deployer.address, disputeWindow);
+  const league = await (await hre.ethers.getContractFactory("FantasyLeague")).deploy(deployer.address, disputeWindow);
   await league.waitForDeployment();
 
-  const data = { chainId: Number((await hre.ethers.provider.getNetwork()).chainId), fan: fan.target, league: league.target };
+  const data = { chainId: Number((await hre.ethers.provider.getNetwork()).chainId), league: league.target };
   const client = hederaClient(hre);
   if (client) {
     try {
@@ -77,27 +86,47 @@ async function deploy(hre, { disputeWindow }) {
       client.close();
     }
   }
-  writeDeployments(hre.network.name, data);
+  writeDeployments(hre.network.name, data, { replace: true });
   return data;
 }
 
-/** Contest templates created for every match, modelled on Dream11's common contest types. */
-const CONTEST_TEMPLATES = [
+/**
+ * Contest templates created for every match, modelled on Dream11's common contest types.
+ * Amounts are in HBAR (the native coin). The mega contest is free to enter; the operator
+ * funds its prize pool. Set MEGA_POOL to change that pool (default 10 HBAR per match).
+ */
+const contestTemplates = () => [
   // Mega contest: free entry, sponsored prize pool
-  { entryFee: 0, sponsoredPool: 10_000, maxEntries: 200, minEntries: 2, maxEntriesPerUser: 6, prizeBps: [4000, 2000, 1200, 800, 600, 500, 400, 300, 200] },
+  { entryFee: 0, sponsoredPool: Number(process.env.MEGA_POOL || 10), maxEntries: 200, minEntries: 2, maxEntriesPerUser: 6, prizeBps: [4000, 2000, 1200, 800, 600, 500, 400, 300, 200] },
   // Head-to-head
-  { entryFee: 50, sponsoredPool: 0, maxEntries: 2, minEntries: 2, maxEntriesPerUser: 1, prizeBps: [10000] },
+  { entryFee: 2, sponsoredPool: 0, maxEntries: 2, minEntries: 2, maxEntriesPerUser: 1, prizeBps: [10000] },
   // Small league
-  { entryFee: 25, sponsoredPool: 0, maxEntries: 10, minEntries: 3, maxEntriesPerUser: 2, prizeBps: [5000, 3000, 2000] },
+  { entryFee: 1, sponsoredPool: 0, maxEntries: 10, minEntries: 3, maxEntriesPerUser: 2, prizeBps: [5000, 3000, 2000] },
 ];
 
+/** Create a match from a bundled data file in data/. */
 async function createMatch(hre, dataId, startTime) {
-  const { fan, league } = await contracts(hre);
-  const [operator] = await hre.ethers.getSigners();
   const { meta } = loadMatchData(dataId);
-  const { canonicalJSON } = await scoring();
+  return createMatchFromMeta(hre, meta, startTime, `data/${dataId}.match.json`);
+}
 
-  const metadataURI = await publish(hre, canonicalJSON(meta), `data/${dataId}.match.json`);
+/**
+ * Create a match and its contests. `meta` holds sport, rulesId, name, teams, short and
+ * players ({ name, side, role, credits }). It is published to HCS, or written to `localFile`
+ * when not on Hedera.
+ */
+async function createMatchFromMeta(hre, meta, startTime, localFile) {
+  const { league } = await contracts(hre);
+  const { canonicalJSON } = await scoring();
+  const u = units(hre);
+
+  const canonical = canonicalJSON(meta);
+  const target = path.join(ROOT, localFile);
+  if (!fs.existsSync(target)) {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(meta, null, 2) + "\n");
+  }
+  const metadataURI = await publish(hre, canonical, localFile);
   await (
     await league.createMatch(
       SPORT[meta.sport],
@@ -110,26 +139,27 @@ async function createMatch(hre, dataId, startTime) {
   ).wait();
   const matchId = await league.matchCount();
 
-  const sponsored = CONTEST_TEMPLATES.reduce((a, t) => a + t.sponsoredPool, 0);
-  await (await fan.mint(operator.address, E(hre, sponsored))).wait();
-  await (await fan.approve(league.target, E(hre, sponsored))).wait();
-  for (const t of CONTEST_TEMPLATES) {
+  for (const t of contestTemplates()) {
+    const sponsoredPool = u.parse(t.sponsoredPool);
     await (
-      await league.createContest({
-        matchId,
-        ...t,
-        entryFee: E(hre, t.entryFee),
-        sponsoredPool: E(hre, t.sponsoredPool),
-        platformFeeBps: 0,
-      })
+      await league.createContest(
+        { matchId, ...t, entryFee: u.parse(t.entryFee), sponsoredPool, platformFeeBps: 0 },
+        { value: u.txValue(sponsoredPool) },
+      )
     ).wait();
   }
   return { matchId, metadataURI };
 }
 
+/** Post results for a match created from a bundled data file. */
 async function postResults(hre, matchId, dataId) {
-  const { league } = await contracts(hre);
   const { meta, stats } = loadMatchData(dataId);
+  return postResultsFromStats(hre, matchId, meta, stats, `data/${dataId}.stats.json`);
+}
+
+/** Compute points from raw stats with the open scoring engine, publish the stats and post. */
+async function postResultsFromStats(hre, matchId, meta, stats, localFile) {
+  const { league } = await contracts(hre);
   const { RULES, computeMatchPoints, canonicalJSON } = await scoring();
 
   const m = await league.getMatch(matchId);
@@ -137,7 +167,12 @@ async function postResults(hre, matchId, dataId) {
 
   const canonical = canonicalJSON(stats);
   const { tenths } = computeMatchPoints(RULES[meta.rulesId], meta.players, stats);
-  const statsRef = await publish(hre, canonical, `data/${dataId}.stats.json`);
+  const target = path.join(ROOT, localFile);
+  if (!fs.existsSync(target)) {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(stats, null, 2) + "\n");
+  }
+  const statsRef = await publish(hre, canonical, localFile);
   await (await league.postResults(matchId, tenths, hashJSON(canonical), statsRef)).wait();
   return { statsRef, tenths };
 }
@@ -167,4 +202,16 @@ async function settleMatch(hre, matchId) {
   return out;
 }
 
-module.exports = { contracts, deploy, createMatch, postResults, settleMatch, rankEntries, loadRef, publish };
+module.exports = {
+  units,
+  contracts,
+  deploy,
+  createMatch,
+  createMatchFromMeta,
+  postResults,
+  postResultsFromStats,
+  settleMatch,
+  rankEntries,
+  loadRef,
+  publish,
+};

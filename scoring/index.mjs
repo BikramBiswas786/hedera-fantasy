@@ -2,7 +2,7 @@
 // this exact code, so anyone can recompute a match's points from the raw stats and compare
 // them with what was posted on-chain.
 
-export { RULES, CRICKET_T20_V1, FOOTBALL_V1 } from "./rules.mjs";
+export { RULES, CRICKET_T20_V1, CRICKET_ODI_V1, FOOTBALL_V1, FOOTBALL_EPL_V1 } from "./rules.mjs";
 
 /** Deterministic JSON: object keys sorted, no whitespace. Hashed for rulesHash / statsHash. */
 export function canonicalJSON(value) {
@@ -74,11 +74,13 @@ export function footballPlayerPoints(rules, role, s = {}) {
   b.appearance = s.started ? rules.starting11 : rules.substitute;
   b.goals = (s.goals || 0) * rules.goal[role];
   b.assists = (s.assists || 0) * rules.assist;
-  b.shotsOnTarget = (s.shotsOnTarget || 0) * rules.shotOnTarget;
-  b.chancesCreated = (s.chancesCreated || 0) * rules.chanceCreated;
-  b.passes = Math.floor((s.passes || 0) / 5) * rules.per5Passes;
-  b.tackles = (s.tackles || 0) * rules.tackleWon;
-  b.interceptions = (s.interceptions || 0) * rules.interceptionWon;
+  // Rule sets only score the stats their data feed provides; a missing rule scores 0.
+  b.shotsOnTarget = (s.shotsOnTarget || 0) * (rules.shotOnTarget ?? 0);
+  b.chancesCreated = (s.chancesCreated || 0) * (rules.chanceCreated ?? 0);
+  b.passes = Math.floor((s.passes || 0) / 5) * (rules.per5Passes ?? 0);
+  b.tackles = (s.tackles || 0) * (rules.tackleWon ?? 0);
+  b.interceptions = (s.interceptions || 0) * (rules.interceptionWon ?? 0);
+  b.clearancesBlocksInterceptions = (s.cbi || 0) * (rules.cbi ?? 0);
   if (role === "GK") b.saves = (s.saves || 0) * rules.save;
   b.penaltySaved = (s.penaltiesSaved || 0) * rules.penaltySaved;
   b.penaltyMissed = (s.penaltiesMissed || 0) * rules.penaltyMissed;

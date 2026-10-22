@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { SPORTS, fmtFan } from "../chain.js";
+import { SPORTS } from "../chain.js";
 import { loadMeta, matchPhase, countdown, maxPool } from "../data.js";
 import { useTicker } from "./hooks.js";
 
@@ -56,7 +56,9 @@ export default function MatchList({ ctx, open }) {
           return (
             <button key={id} className="card match-card" onClick={() => open(id)}>
               <div className="row between">
-                <span className="muted">{SPORTS[Number(m.sport)] === "cricket" ? "🏏 Cricket" : "⚽ Football"}</span>
+                <span className="muted">
+                  {SPORTS[Number(m.sport)] === "cricket" ? "🏏" : "⚽"} {meta?.competition || (SPORTS[Number(m.sport)] === "cricket" ? "Cricket" : "Football")}
+                </span>
                 <span className={`phase ${phase.key}`}>{phase.label}</span>
               </div>
               <div className="versus">
@@ -75,7 +77,7 @@ export default function MatchList({ ctx, open }) {
               <div className="row between muted small">
                 <span>{m.name}</span>
                 <span>
-                  {contests} contests · {fmtFan(prize)} FAN
+                  {contests} contests · {ctx.coin.format(prize)}
                 </span>
               </div>
             </button>

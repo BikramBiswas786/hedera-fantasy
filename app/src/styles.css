@@ -184,6 +184,11 @@ footer {
   font-weight: 600;
 }
 
+a.btn {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;

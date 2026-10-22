@@ -54,6 +54,7 @@ export default function MatchView({ ctx, matchId, back }) {
           </span>
         </div>
         <div className="row center gap">
+          {meta.competition && <span className="chip">{meta.competition}</span>}
           <span className={`phase ${phase.key}`}>{phase.label}</span>
           {open && <span className="muted">Deadline in {countdown(Number(m.startTime) - now)} · teams lock automatically on-chain</span>}
           {phase.key === "review" && (

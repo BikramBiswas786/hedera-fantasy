@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { fmtFan } from "../chain.js";
 import { contestKind, maxPool, contestPool, sameAddr } from "../data.js";
 
 const STATUS = ["Open", "Settled", "Cancelled"];
@@ -25,11 +24,11 @@ export default function Contests({ ctx, data, open, myTeams, createTeam, viewBoa
             <div className="row between baseline">
               <div>
                 <div className="muted small">Prize pool</div>
-                <div className="pool">{fmtFan(pool)} FAN</div>
+                <div className="pool">{ctx.coin.format(pool)}</div>
               </div>
               <div className="right">
                 <div className="muted small">Entry</div>
-                <div className="fee">{c.entryFee === 0n ? "FREE" : `${fmtFan(c.entryFee)} FAN`}</div>
+                <div className="fee">{c.entryFee === 0n ? "FREE" : ctx.coin.format(c.entryFee)}</div>
               </div>
             </div>
             <div className="bar">
@@ -40,7 +39,7 @@ export default function Contests({ ctx, data, open, myTeams, createTeam, viewBoa
               <span className="muted">{Number(c.maxEntries)} spots</span>
             </div>
             <div className="row between small muted footer-row">
-              <span>🥇 {fmtFan((pool * BigInt(c.prizeBps[0])) / 10000n)}</span>
+              <span>🥇 {ctx.coin.format((pool * BigInt(c.prizeBps[0])) / 10000n)}</span>
               <span>🏆 {Math.round((winners / Number(c.maxEntries)) * 100)}% win</span>
               <span>{Number(c.maxEntriesPerUser) === 1 ? "Single entry" : `Up to ${Number(c.maxEntriesPerUser)} teams`}</span>
               <span title="Refunded automatically below this many entries">{guaranteed ? "✓ Guaranteed" : `Min ${Number(c.minEntries)}`}</span>
@@ -52,7 +51,7 @@ export default function Contests({ ctx, data, open, myTeams, createTeam, viewBoa
                   {c.prizeBps.map((bps, r) => (
                     <tr key={r}>
                       <td>Rank {r + 1}</td>
-                      <td className="right">{fmtFan((pool * BigInt(bps)) / 10000n)} FAN</td>
+                      <td className="right">{ctx.coin.format((pool * BigInt(bps)) / 10000n)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -85,14 +84,8 @@ function JoinDialog({ ctx, data, contest, myTeams, createTeam, close }) {
   const name = (i) => data.players[i].name;
 
   const join = async () => {
-    if (contest.entryFee > 0n) {
-      const allowance = await ctx.read.fan.allowance(ctx.account, ctx.read.league.target);
-      if (allowance < contest.entryFee) {
-        const ok = await ctx.tx("Approve FAN", (w) => w.fan.approve(ctx.read.league.target, contest.entryFee));
-        if (!ok) return;
-      }
-    }
-    const ok = await ctx.tx("Join contest", (w) => w.league.joinContest(contest.id, teamId));
+    const value = ctx.coin.txValue(contest.entryFee);
+    const ok = await ctx.tx("Join contest", (w) => w.league.joinContest(contest.id, teamId, { value }));
     if (ok) close();
   };
 
@@ -112,7 +105,7 @@ function JoinDialog({ ctx, data, contest, myTeams, createTeam, close }) {
         ) : (
           <>
             <p className="muted">
-              Entry: {contest.entryFee === 0n ? "free" : `${fmtFan(contest.entryFee)} FAN`}. Your team stays editable until the deadline.
+              Entry: {contest.entryFee === 0n ? "free" : ctx.coin.format(contest.entryFee)}. Your team stays editable until the deadline.
             </p>
             {available.map((t) => (
               <label key={t.id} className="radio">

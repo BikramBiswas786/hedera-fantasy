@@ -1,13 +1,33 @@
 # OpenXI: transparent fantasy cricket and football on Hedera
 
-A free-to-play, Dream11-style daily fantasy game where the rules, teams, scores and payouts live on Hedera.
-Users can check every step themselves instead of trusting the operator.
+A Dream11-style daily fantasy game for **Premier League football and international cricket**, where the rules,
+teams, scores and payouts live on Hedera. Users can check every step themselves instead of trusting the operator.
 
-> FAN is a testnet game token with no monetary value. This project is free-to-play only.
+> Testnet only. Entry fees and prizes are paid in **testnet HBAR**, which has no monetary value. Get some free from
+> the [Hedera portal faucet](https://portal.hedera.com/faucet).
 
 **Live app:** https://openxi-fantasy.vercel.app (Hedera testnet). Every push to `main` redeploys it.
 
-Testnet contracts: [FantasyLeague](https://hashscan.io/testnet/contract/0x37d26A343469cDFef9116fF50f7911425aCDf14f) · [FanToken](https://hashscan.io/testnet/contract/0xd8B9252D9cb3e41ec68Eaf26F55467D20573188c) · [HCS data topic](https://hashscan.io/testnet/topic/0.0.11129616)
+The current contract and HCS topic addresses are in [`deployments.json`](deployments.json) and on the app's 🔍 Verify tab.
+
+## Real fixtures, automatically
+
+The [Sync matches](.github/workflows/sync-matches.yml) workflow runs every hour on GitHub Actions:
+
+| Step | Premier League | International cricket (T20I, ODI) |
+|---|---|---|
+| Fixtures and squads | [Fantasy Premier League API](https://fantasy.premierleague.com/api/bootstrap-static/) (public) | [CricketData.org](https://cricketdata.org) (free API key) |
+| Credits | FPL prices, £4.0m-£15.0m mapped to 7.0-11.0 credits | By role (the feed has no player ratings) |
+| Imported | Fixtures starting in the next 3 days | Same, for matches between national teams |
+| Results | Per-player stats once FPL marks the fixture finished | Scorecard once the match has ended |
+| Rules | `football-epl-v1` | `cricket-t20-v1`, `cricket-odi-v1` |
+
+It also abandons postponed or no-result matches, which refunds every contest, and settles contests once the
+dispute window has passed. `DRY_RUN=1` logs what it would do without sending transactions.
+
+Feed limits to know about: FPL publishes no shots, chances or passes, so the Premier League rules score goals,
+assists, clean sheets, saves, tackles, clearances/blocks/interceptions and cards. CricketData scorecards have no
+dot balls, and a player who neither bats, bowls nor takes part in a dismissal misses the playing-XI bonus.
 
 ## What it does (Dream11 feature parity)
 
@@ -24,7 +44,8 @@ Testnet contracts: [FantasyLeague](https://hashscan.io/testnet/contract/0x37d26A
 | Unfilled contests refunded | Anyone can trigger the refund on-chain |
 | "Selected by %" | Computed from the public on-chain teams |
 | Leaderboard and team preview | Yes, with a pitch view |
-| Points system | Dream11-style T20 and football tables in `scoring/rules.mjs` |
+| Points system | Dream11-style T20, ODI and football tables in `scoring/rules.mjs` |
+| Cash contests | Entry fees and prizes in testnet HBAR, paid straight from and to your wallet |
 
 ## What's more transparent than Dream11
 
@@ -45,13 +66,15 @@ Testnet contracts: [FantasyLeague](https://hashscan.io/testnet/contract/0x37d26A
 ## Layout
 
 ```
-contracts/FantasyLeague.sol   matches, teams, contests, results, verified settlement, refunds, claims
-contracts/FanToken.sol        free FAN game token with a daily faucet
+contracts/FantasyLeague.sol   matches, teams, contests (paid in HBAR), results, verified settlement, refunds, claims
 scoring/                      open-source points engine + rules + HCS reader (shared by scripts and app)
-scripts/                      deploy, create-match, post-results, settle, verify, local demo
+scripts/sync.js               imports real fixtures, posts results, settles (run hourly by GitHub Actions)
+scripts/feeds/                Fantasy Premier League and CricketData.org adapters
+scripts/                      deploy, verify, demo and manual match scripts
 data/                         demo fixtures (fictional teams and players) with squads and raw stats
 app/                          React + Vite web app (ethers v6, MetaMask or local dev accounts)
-test/                         contract tests
+test/                         contract and feed tests
+.github/workflows/            testnet deploy and hourly match sync
 ```
 
 ## Run it locally
@@ -70,7 +93,18 @@ npm run demo:finish    # fast-forward past the deadline, post results, settle
 MATCH_ID=1 npx hardhat run scripts/verify.js --network localhost
 ```
 
-## Deploy to Hedera testnet
+## Run it on GitHub Actions (recommended)
+
+1. In the repo's **Settings → Secrets and variables → Actions**, add `HEDERA_ACCOUNT_ID` and `HEDERA_PRIVATE_KEY`
+   (an ECDSA testnet account from <https://portal.hedera.com>), and optionally `CRICKETDATA_API_KEY`.
+2. Run **Actions → Deploy to Hedera testnet**. It deploys the contract, creates the HCS topic and commits the new
+   addresses, which redeploys the web app.
+3. **Sync matches** then runs every hour. Run it by hand with "dry run" ticked to preview what it will import.
+
+The operator account funds each free mega contest (10 HBAR by default, `MEGA_POOL`) and pays transaction fees, so
+top it up from the portal faucet now and then.
+
+## Deploy to Hedera testnet from your computer
 
 1. Create a free testnet account at <https://portal.hedera.com> (ECDSA key). It comes with testnet HBAR.
 2. `cp .env.example .env`, then fill in `HEDERA_ACCOUNT_ID` and `HEDERA_PRIVATE_KEY`.
@@ -92,17 +126,15 @@ MATCH_ID=1 npx hardhat run scripts/verify.js --network localhost
 6. Copy the updated `deployments.json` into `app/src/deployments.json` (the scripts do this automatically), then
    `npm run app` and select "Hedera Testnet". MetaMask is added to Hedera testnet (chain 296) automatically.
 
-Contracts, the token and the HCS topic can all be viewed on [HashScan](https://hashscan.io/testnet).
+The contract and the HCS topic can both be viewed on [HashScan](https://hashscan.io/testnet).
 
-## Adding real matches
+## Adding another competition
 
-Each match needs two files in `data/`:
-
-- `<id>.match.json`: `sport`, `rulesId`, team names, and `players` (`name`, `side` 0/1, `role` 0-3, `credits` in tenths).
-- `<id>.stats.json`: raw per-player stats keyed by player index. The field names are in `scoring/index.mjs`.
-
-To go live, write a small adapter that turns a sports data API (for example CricAPI, SportMonks or API-Football)
-into these two files, then run the same scripts.
+Write an adapter in `scripts/feeds/` with `upcoming(from, to)` returning `{ meta, startTime }` for each fixture and
+`result(meta, startTime, now)` returning `null`, `{ abandon: true }` or `{ stats }`, then register it in
+`scripts/sync.js`. `meta` holds `sport`, `rulesId`, `competition`, `name`, `teams`, `short`, `source.key` and
+`players` (`name`, `side` 0/1, `role` 0-3, `credits` in tenths, `ref`); stats are keyed by player index with the
+field names used in `scoring/index.mjs`. `scripts/dev/mock-fpl.cjs` shows how to test sync against local files.
 
 ## Known limits and next steps
 
@@ -114,10 +146,9 @@ into these two files, then run the same scripts.
 - **The oracle is still one key.** Data is verifiable after the fact, and the dispute window gives time to catch
   errors. For stronger guarantees, require several independent oracles or a multisig to agree.
 - **Live points during the match** aren't implemented yet. The oracle could post interim (non-final) points to HCS.
-- **FAN is an EVM ERC-20.** It could become a native Hedera Token Service (HTS) token, and HashPack could be supported
-  through WalletConnect.
-- **Legal.** Keep this free-to-play. India's Promotion and Regulation of Online Gaming Act, 2025 bans real-money
-  online games, including paid fantasy sports. Check the law in each country before adding anything of value.
+- **Wallets.** MetaMask on Hedera testnet works today; HashPack could be supported through WalletConnect.
+- **Legal.** Keep this on testnet. Paid contests with mainnet HBAR would be real-money fantasy gaming, which India's
+  Promotion and Regulation of Online Gaming Act, 2025 bans, and many other countries regulate.
 
 ## Host the web app on Vercel
 

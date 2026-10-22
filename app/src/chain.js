@@ -1,6 +1,5 @@
 import { ethers } from "ethers";
 import leagueAbi from "./abi/FantasyLeague.json";
-import fanAbi from "./abi/FanToken.json";
 import deployments from "./deployments.json";
 import { GasSafeSigner } from "./gasSafeSigner.js";
 import { fetchHcsMessage } from "../../scoring/hcs.mjs";
@@ -11,6 +10,7 @@ export const NETWORKS = {
     chainId: 31337,
     rpcUrl: "http://127.0.0.1:8545",
     explorer: null,
+    coin: { symbol: "ETH", decimals: 18, txScale: 1n },
   },
   hederaTestnet: {
     label: "Hedera Testnet",
@@ -18,6 +18,9 @@ export const NETWORKS = {
     rpcUrl: "https://testnet.hashio.io/api",
     explorer: "https://hashscan.io/testnet",
     currency: { name: "HBAR", symbol: "HBAR", decimals: 18 },
+    // Contract amounts are tinybars (8 decimals); transaction values use 18 decimals.
+    coin: { symbol: "HBAR", decimals: 8, txScale: 10n ** 10n },
+    faucet: "https://portal.hedera.com/faucet",
   },
 };
 
@@ -58,7 +61,6 @@ export function readContracts(network) {
   return {
     provider,
     league: new ethers.Contract(d.league, leagueAbi, provider),
-    fan: new ethers.Contract(d.fan, fanAbi, provider),
   };
 }
 
@@ -67,7 +69,6 @@ export function writeContracts(network, signer) {
   const safe = new GasSafeSigner(signer, readContracts(network).provider);
   return {
     league: new ethers.Contract(d.league, leagueAbi, safe),
-    fan: new ethers.Contract(d.fan, fanAbi, safe),
   };
 }
 
@@ -115,10 +116,23 @@ export async function loadRefText(ref) {
 }
 
 export const keccakText = (text) => ethers.keccak256(ethers.toUtf8Bytes(text));
-export const fmtFan = (wei) => {
-  const n = Number(ethers.formatEther(wei));
-  return n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 2 : 0 });
-};
+/** Formatting and conversion for a network's native coin (HBAR on Hedera). */
+export function coinOf(network) {
+  const { symbol, decimals, txScale } = NETWORKS[network].coin;
+  const fmt = (amount, d) => {
+    const n = Number(ethers.formatUnits(amount, d));
+    return `${n.toLocaleString(undefined, { maximumFractionDigits: n < 10 ? 2 : 0 })} ${symbol}`;
+  };
+  return {
+    symbol,
+    /** An amount stored in the contract (tinybars on Hedera). */
+    format: (amount) => fmt(amount, decimals),
+    /** A wallet balance from eth_getBalance (always 18 decimals). */
+    formatBalance: (wei) => fmt(wei, 18),
+    /** Transaction value for a contract amount. */
+    txValue: (amount) => BigInt(amount) * txScale,
+  };
+}
 export const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 /** Turn a contract revert into a readable message. */

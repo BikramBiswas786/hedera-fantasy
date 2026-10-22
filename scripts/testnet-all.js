@@ -16,7 +16,6 @@ async function main() {
   const final = readDeployments()[hre.network.name];
   const scan = "https://hashscan.io/testnet";
   console.log(`\nFantasyLeague: ${scan}/contract/${final.league}`);
-  console.log(`FanToken:      ${scan}/contract/${final.fan}`);
   if (final.hcsTopicId) console.log(`HCS topic:     ${scan}/topic/${final.hcsTopicId}`);
   console.log("\nNext: npm run app, choose Hedera Testnet, connect MetaMask.");
 }
