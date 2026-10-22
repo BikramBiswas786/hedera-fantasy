@@ -6,7 +6,7 @@
   },
   "hederaTestnet": {
     "chainId": 296,
-    "league": "0x0BE24Fe1f95aF8700D07Da232509902d0E1064D0",
-    "hcsTopicId": "0.0.11132060"
+    "league": "0x68C31214065952ff3cDCAfc6C063f6647b67061A",
+    "hcsTopicId": "0.0.11132069"
   }
 }
