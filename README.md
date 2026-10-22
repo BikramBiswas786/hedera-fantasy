@@ -18,7 +18,7 @@ The [Sync matches](.github/workflows/sync-matches.yml) workflow runs every hour 
 |---|---|---|
 | Fixtures and squads | [Fantasy Premier League API](https://fantasy.premierleague.com/api/bootstrap-static/) (public) | [CricketData.org](https://cricketdata.org) (free API key) |
 | Credits | FPL prices: £4.0m is 7.0 credits, £10.0m and up is 11.0 | By role (the feed has no player ratings) |
-| Imported | Fixtures starting in the next 3 days | Same, for matches between national teams |
+| Imported | Fixtures starting in the next 7 days | Same, for internationals and major T20 leagues (IPL, BBL/WBBL, PSL, CPL, SA20, The Hundred and more) |
 | Results | Per-player stats once FPL marks the fixture finished | Scorecard once the match has ended |
 | Rules | `football-epl-v1` | `cricket-t20-v1`, `cricket-odi-v1` |
 
@@ -38,7 +38,8 @@ dot balls, and a player who neither bats, bowls nor takes part in a dismissal mi
 | Role limits (cricket WK/BAT/AR/BOWL 1-8 each; football 1 GK, 3-5 DEF, 3-5 MID, 1-3 FWD) | Same, enforced on-chain |
 | Captain 2x, vice-captain 1.5x | Same. The contract computes the multiplied score |
 | Up to 20 teams per match, editable until the deadline | Same. Teams lock automatically at the on-chain start time |
-| Mega contests, head-to-head, small leagues | All three are created for every match |
+| Mega contests, head-to-head, small leagues | Five pools for every match: free mega (sponsored), 250-team grand pool (up to 500 HBAR), head-to-head, 5-team and 10-team |
+| Private / friends' contests | **Anyone can create a pool**: duo, 5, 10, 25, 50, 100, 250 or 300 teams, any entry fee, prize split and optional prize money, with a share link |
 | Spots, prize breakdown, % winners, max entries per user | Shown on every contest card |
 | Ties share the prizes for their ranks | Same rule, implemented in the contract |
 | Unfilled contests refunded | Anyone can trigger the refund on-chain |

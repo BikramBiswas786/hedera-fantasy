@@ -1,8 +1,9 @@
 // Keeps the chain in step with real fixtures. Run on a schedule (see .github/workflows/sync-matches.yml):
 //   npx hardhat run scripts/sync.js --network hederaTestnet
 // Each run:
-//   1. imports Premier League fixtures (FPL API) and international T20/ODI matches (CricketData,
-//      when CRICKETDATA_API_KEY is set) starting within LOOKAHEAD_DAYS that aren't on-chain yet
+//   1. imports Premier League fixtures (FPL API) and international T20/ODI and major T20 league
+//      matches (CricketData, when CRICKETDATA_API_KEY is set) starting within LOOKAHEAD_DAYS that
+//      aren't on-chain yet, at most MAX_IMPORTS_PER_RUN per run
 //   2. abandons matches whose fixture was postponed or produced no result (contests refund)
 //   3. posts results for finished matches, with the raw stats published to HCS
 //   4. settles contests once the dispute window has passed
@@ -17,7 +18,9 @@ const { createCricketFeed } = require("./feeds/cricketdata");
 
 // Without an operator key there is nothing to sign with, so only report what would happen.
 const DRY_RUN = process.env.DRY_RUN === "1" || (hre.network.name !== "localhost" && !process.env.HEDERA_PRIVATE_KEY);
-const LOOKAHEAD = Number(process.env.LOOKAHEAD_DAYS || 3) * 86400;
+const LOOKAHEAD = Number(process.env.LOOKAHEAD_DAYS || 7) * 86400;
+// Each import is a few transactions; later runs pick up the rest.
+const MAX_IMPORTS = Number(process.env.MAX_IMPORTS_PER_RUN || 12);
 const MIN_LEAD = 15 * 60; // don't import a match that starts within 15 minutes
 const CACHE_FILE = path.join(ROOT, ".cache", "metadata.json");
 // The cricket list costs requests from a 100/day quota, so only refresh it every few hours.
@@ -104,8 +107,9 @@ async function main() {
   const registry = await loadRegistry(league);
   console.log(`${registry.matches.length} matches on-chain`);
 
-  // 1. Import upcoming fixtures
+  // 1. Import upcoming fixtures, soonest first
   const hour = new Date(now * 1000).getUTCHours();
+  const candidates = [];
   for (const feed of Object.values(feeds)) {
     if (feed.provider === "cricketdata" && hour % CRICKET_LIST_EVERY_HOURS !== 0 && !process.env.FORCE_CRICKET_LIST) continue;
     let upcoming = [];
@@ -116,14 +120,16 @@ async function main() {
       continue;
     }
     console.log(`${feed.provider}: ${upcoming.length} fixtures in the next ${LOOKAHEAD / 86400} days`);
-    for (const { meta, startTime } of upcoming) {
-      if (registry.keys.has(meta.source.key)) continue;
-      await act(`create ${meta.competition}: ${meta.name} (${meta.players.length} players) at ${meta.kickoff}`, async () => {
-        const safeKey = meta.source.key.replace(/[^a-z0-9]+/gi, "-");
-        const { matchId } = await createMatchFromMeta(hre, meta, startTime, `data/live/${safeKey}.match.json`);
-        console.log(`    -> match #${matchId}`);
-      });
-    }
+    candidates.push(...upcoming.filter(({ meta }) => !registry.keys.has(meta.source.key)));
+  }
+  candidates.sort((a, b) => a.startTime - b.startTime);
+  if (candidates.length > MAX_IMPORTS) console.log(`${candidates.length} new fixtures; importing the first ${MAX_IMPORTS} this run`);
+  for (const { meta, startTime } of candidates.slice(0, MAX_IMPORTS)) {
+    await act(`create ${meta.competition}: ${meta.name} (${meta.players.length} players) at ${meta.kickoff}`, async () => {
+      const safeKey = meta.source.key.replace(/[^a-z0-9]+/gi, "-");
+      const { matchId } = await createMatchFromMeta(hre, meta, startTime, `data/live/${safeKey}.match.json`);
+      console.log(`    -> match #${matchId}`);
+    });
   }
 
   // 2 + 3. Abandon postponed fixtures and post results for finished ones
@@ -204,4 +210,6 @@ main()
   })
   .finally(() => {
     if (process.env.GITHUB_ACTIONS) process.stdout.write(`::notice title=Sync log::${escape(lines.join("\n").slice(-60000))}\n`);
+    // Don't let open network handles (HCS gRPC, keep-alive sockets) keep the job running
+    setTimeout(() => process.exit(), 1000).unref();
   });

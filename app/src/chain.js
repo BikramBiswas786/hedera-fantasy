@@ -131,6 +131,8 @@ export function coinOf(network) {
     formatBalance: (wei) => fmt(wei, 18),
     /** Transaction value for a contract amount. */
     txValue: (amount) => BigInt(amount) * txScale,
+    /** A contract amount from a human amount such as "2.5". */
+    parse: (amount) => ethers.parseUnits(String(amount || 0), decimals),
   };
 }
 export const shortAddr = (a) => `${a.slice(0, 6)}…${a.slice(-4)}`;

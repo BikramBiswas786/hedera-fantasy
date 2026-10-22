@@ -26,6 +26,11 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
     uint8 public constant MAX_TEAMS_PER_MATCH = 20;
     uint8 public constant ROLE_COUNT = 4;
     uint16 public constant BPS = 10_000;
+    // Sized so settling a full contest, with every winner a different player, stays inside
+    // Hedera's 15M gas per transaction (see the worst-case test).
+    uint32 public constant MAX_CONTEST_SIZE = 300;
+    uint16 public constant MAX_PRIZE_RANKS = 150;
+    uint16 public constant MAX_CONTESTS_PER_MATCH = 100;
 
     enum Sport {
         Cricket,
@@ -79,21 +84,23 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         uint32 maxEntries;
         uint32 minEntries;
         uint8 maxEntriesPerUser;
-        uint16 platformFeeBps;
+        uint16 platformFeeBps; // operators only; must be 0 for anyone else
         uint16[] prizeBps; // share of the pool per rank, must sum to 10000 and be non-increasing
+        string name;
     }
 
     struct Contest {
         uint256 matchId;
         uint256 entryFee;
         uint256 sponsoredPool;
-        address sponsor;
+        address sponsor; // the contest's creator, who also funded sponsoredPool
         uint32 maxEntries;
         uint32 minEntries;
         uint8 maxEntriesPerUser;
         uint16 platformFeeBps;
         ContestStatus status;
         uint16[] prizeBps;
+        string name;
     }
 
     struct Entry {
@@ -125,7 +132,16 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
 
     event MatchCreated(uint256 indexed matchId, Sport sport, string name, uint64 startTime, bytes32 rulesHash, string metadataURI);
     event TeamSaved(uint256 indexed teamId, uint256 indexed matchId, address indexed owner, uint8[11] picks, uint8 captain, uint8 viceCaptain);
-    event ContestCreated(uint256 indexed contestId, uint256 indexed matchId, uint256 entryFee, uint256 sponsoredPool, uint32 maxEntries, uint16[] prizeBps);
+    event ContestCreated(
+        uint256 indexed contestId,
+        uint256 indexed matchId,
+        address indexed creator,
+        string name,
+        uint256 entryFee,
+        uint256 sponsoredPool,
+        uint32 maxEntries,
+        uint16[] prizeBps
+    );
     event ContestJoined(uint256 indexed contestId, uint256 indexed entryIndex, address indexed user, uint256 teamId);
     event ResultsPosted(uint256 indexed matchId, bytes32 statsHash, string statsRef, int32[] points);
     event MatchAbandoned(uint256 indexed matchId);
@@ -299,15 +315,37 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
     // Contests
     // ---------------------------------------------------------------------
 
-    /// @notice Create a contest. The operator funds `sponsoredPool` by sending exactly that much HBAR.
-    function createContest(ContestParams calldata p) external payable onlyRole(OPERATOR_ROLE) returns (uint256 contestId) {
+    /// @notice Create a contest (a "pool") for an upcoming match. Anyone can: a duo, a 5- or
+    ///         10-team league, or a big pool of up to MAX_CONTEST_SIZE entries. The creator can
+    ///         seed the prize pool by sending exactly `sponsoredPool` in HBAR.
+    function createContest(ContestParams calldata p) external payable returns (uint256 contestId) {
+        require(msg.value == p.sponsoredPool, "Contest: send sponsored pool");
+        return _createContest(p);
+    }
+
+    /// @notice Create several contests in one transaction; send the sum of their sponsored pools.
+    function createContests(ContestParams[] calldata ps) external payable returns (uint256 firstId) {
+        uint256 total;
+        for (uint256 i = 0; i < ps.length; i++) {
+            total += ps[i].sponsoredPool;
+            uint256 id = _createContest(ps[i]);
+            if (i == 0) firstId = id;
+        }
+        require(msg.value == total, "Contest: send sponsored pool");
+    }
+
+    function _createContest(ContestParams calldata p) internal returns (uint256 contestId) {
         Match storage m = _matches[p.matchId];
         require(m.startTime != 0 && m.status == MatchStatus.Scheduled, "Contest: bad match");
         require(block.timestamp < m.startTime, "Contest: match started");
-        require(p.maxEntries >= 2 && p.minEntries >= 1 && p.minEntries <= p.maxEntries, "Contest: bad size");
+        require(_contestsOfMatch[p.matchId].length < MAX_CONTESTS_PER_MATCH, "Contest: match is full");
+        require(p.maxEntries >= 2 && p.maxEntries <= MAX_CONTEST_SIZE, "Contest: 2 to 300 entries");
+        require(p.minEntries >= 1 && p.minEntries <= p.maxEntries, "Contest: bad size");
         require(p.maxEntriesPerUser >= 1, "Contest: bad per-user limit");
+        require(bytes(p.name).length <= 48, "Contest: name too long");
+        if (!hasRole(OPERATOR_ROLE, msg.sender)) require(p.platformFeeBps == 0, "Contest: only operators take a fee");
         require(p.platformFeeBps <= 2_000, "Contest: fee too high");
-        require(p.prizeBps.length >= 1 && p.prizeBps.length <= p.maxEntries, "Contest: bad prizes");
+        require(p.prizeBps.length >= 1 && p.prizeBps.length <= p.maxEntries && p.prizeBps.length <= MAX_PRIZE_RANKS, "Contest: bad prizes");
 
         uint256 total;
         for (uint256 i = 0; i < p.prizeBps.length; i++) {
@@ -315,8 +353,6 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
             total += p.prizeBps[i];
         }
         require(total == BPS, "Contest: prizes must sum to 100%");
-
-        require(msg.value == p.sponsoredPool, "Contest: send sponsored pool");
 
         contestId = ++contestCount;
         Contest storage c = _contests[contestId];
@@ -329,8 +365,9 @@ contract FantasyLeague is AccessControl, ReentrancyGuard {
         c.maxEntriesPerUser = p.maxEntriesPerUser;
         c.platformFeeBps = p.platformFeeBps;
         c.prizeBps = p.prizeBps;
+        c.name = p.name;
         _contestsOfMatch[p.matchId].push(contestId);
-        emit ContestCreated(contestId, p.matchId, p.entryFee, p.sponsoredPool, p.maxEntries, p.prizeBps);
+        emit ContestCreated(contestId, p.matchId, msg.sender, p.name, p.entryFee, p.sponsoredPool, p.maxEntries, p.prizeBps);
     }
 
     /// @notice Join a contest by sending exactly the entry fee in HBAR (0 for free contests).

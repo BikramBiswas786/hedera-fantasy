@@ -43,11 +43,15 @@ export function maxPool(c) {
   return contestPool(c, Number(c.maxEntries));
 }
 
+export function matchLink(matchId, contestId) {
+  return `#/match/${matchId}${contestId ? `/contest/${contestId}` : ""}`;
+}
+
 export function contestKind(c) {
+  if (c.name) return c.name;
   if (Number(c.maxEntries) === 2) return "Head-to-head";
-  if (c.entryFee === 0n) return "Free mega contest";
-  if (Number(c.maxEntries) <= 20) return "Small league";
-  return "Mega contest";
+  if (c.entryFee === 0n) return "Free contest";
+  return `${Number(c.maxEntries)}-team pool`;
 }
 
 /** Everything the match screen needs, reloaded whenever ctx.version changes. */

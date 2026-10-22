@@ -26,7 +26,7 @@ async function main() {
         await (await league.connect(user).joinContest(contestId, teamId, { value: units(hre).txValue(entryFee) })).wait();
       };
       await join(contestIds[0]); // free mega contest
-      if (k < 3) await join(contestIds[2]); // paid small league
+      if (k < 3) await join(contestIds[4]); // paid 10-team pool
     }
     console.log(`Match #${matchId} ${dataId}: ${signers.length} teams joined`);
   }

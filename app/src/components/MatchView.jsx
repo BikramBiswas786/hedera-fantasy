@@ -7,7 +7,7 @@ import MyTeams from "./MyTeams.jsx";
 import Leaderboard from "./Leaderboard.jsx";
 import Transparency from "./Transparency.jsx";
 
-export default function MatchView({ ctx, matchId, back }) {
+export default function MatchView({ ctx, matchId, invitedContest, back }) {
   const { data, error } = useMatchData(ctx, matchId);
   const [tab, setTab] = useState("contests");
   const [editing, setEditing] = useState(null); // team being edited, or "new"
@@ -85,6 +85,8 @@ export default function MatchView({ ctx, matchId, back }) {
         <Contests
           ctx={ctx}
           data={data}
+          matchId={matchId}
+          invitedContest={invitedContest}
           open={open}
           myTeams={myTeams}
           createTeam={() => go("create")}

@@ -10,6 +10,8 @@ module.exports = {
     settings: { optimizer: { enabled: true, runs: 200 }, viaIR: true, evmVersion: "cancun" },
   },
   networks: {
+    // enough test accounts to fill a maximum-size (300-entry) contest with different players
+    hardhat: { accounts: { count: 310 } },
     hederaTestnet: {
       url: process.env.HEDERA_RPC_URL || "https://testnet.hashio.io/api",
       chainId: 296,

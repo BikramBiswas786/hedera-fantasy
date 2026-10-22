@@ -43,13 +43,17 @@ async function publish(hre, text, localFile) {
   const topicId = readDeployments()[hre.network.name]?.hcsTopicId;
   if (!client || !topicId) return `file:${localFile}`;
   const { TopicMessageSubmitTransaction } = require("@hashgraph/sdk");
-  const responses = await new TopicMessageSubmitTransaction()
-    .setTopicId(topicId)
-    .setMessage(text)
-    .setMaxChunks(50)
-    .executeAll(client);
-  const receipt = await responses[0].getReceipt(client);
-  return `hcs:${topicId}:${receipt.topicSequenceNumber.toString()}`;
+  try {
+    const responses = await new TopicMessageSubmitTransaction()
+      .setTopicId(topicId)
+      .setMessage(text)
+      .setMaxChunks(50)
+      .executeAll(client);
+    const receipt = await responses[0].getReceipt(client);
+    return `hcs:${topicId}:${receipt.topicSequenceNumber.toString()}`;
+  } finally {
+    client.close(); // an open client keeps the process alive
+  }
 }
 
 /** Load the text behind a ref ("hcs:..." or "file:..."). */
@@ -74,7 +78,7 @@ async function deploy(hre, { disputeWindow }) {
   const league = await (await hre.ethers.getContractFactory("FantasyLeague")).deploy(deployer.address, disputeWindow);
   await league.waitForDeployment();
 
-  const data = { chainId: Number((await hre.ethers.provider.getNetwork()).chainId), league: league.target };
+  const data = { chainId: Number((await hre.ethers.provider.getNetwork()).chainId), league: league.target, operator: deployer.address };
   const client = hederaClient(hre);
   if (client) {
     try {
@@ -91,17 +95,16 @@ async function deploy(hre, { disputeWindow }) {
 }
 
 /**
- * Contest templates created for every match, modelled on Dream11's common contest types.
- * Amounts are in HBAR (the native coin). The mega contest is free to enter; the operator
- * funds its prize pool. Set MEGA_POOL to change that pool (default 10 HBAR per match).
+ * Pools created for every match, modelled on Dream11's contest types. Amounts are in HBAR.
+ * The mega contest is free to enter and its prize pool is funded by the operator (MEGA_POOL,
+ * default 10 HBAR). Players can create their own pools in the app on top of these.
  */
 const contestTemplates = () => [
-  // Mega contest: free entry, sponsored prize pool
-  { entryFee: 0, sponsoredPool: Number(process.env.MEGA_POOL || 10), maxEntries: 200, minEntries: 2, maxEntriesPerUser: 6, prizeBps: [4000, 2000, 1200, 800, 600, 500, 400, 300, 200] },
-  // Head-to-head
-  { entryFee: 2, sponsoredPool: 0, maxEntries: 2, minEntries: 2, maxEntriesPerUser: 1, prizeBps: [10000] },
-  // Small league
-  { entryFee: 1, sponsoredPool: 0, maxEntries: 10, minEntries: 3, maxEntriesPerUser: 2, prizeBps: [5000, 3000, 2000] },
+  { name: "Mega contest", entryFee: 0, sponsoredPool: Number(process.env.MEGA_POOL || 10), maxEntries: 200, minEntries: 2, maxEntriesPerUser: 6, prize: "top10pct" },
+  { name: "Grand pool", entryFee: 2, sponsoredPool: 0, maxEntries: 250, minEntries: 10, maxEntriesPerUser: 6, prize: "top25pct" },
+  { name: "Head-to-head", entryFee: 2, sponsoredPool: 0, maxEntries: 2, minEntries: 2, maxEntriesPerUser: 1, prize: "winner" },
+  { name: "5-team pool", entryFee: 3, sponsoredPool: 0, maxEntries: 5, minEntries: 3, maxEntriesPerUser: 1, prize: "top2" },
+  { name: "10-team pool", entryFee: 2, sponsoredPool: 0, maxEntries: 10, minEntries: 4, maxEntriesPerUser: 2, prize: "top3" },
 ];
 
 /** Create a match from a bundled data file in data/. */
@@ -139,15 +142,17 @@ async function createMatchFromMeta(hre, meta, startTime, localFile) {
   ).wait();
   const matchId = await league.matchCount();
 
-  for (const t of contestTemplates()) {
-    const sponsoredPool = u.parse(t.sponsoredPool);
-    await (
-      await league.createContest(
-        { matchId, ...t, entryFee: u.parse(t.entryFee), sponsoredPool, platformFeeBps: 0 },
-        { value: u.txValue(sponsoredPool) },
-      )
-    ).wait();
-  }
+  const { prizeBps } = await import("../scoring/prizes.mjs");
+  const pools = contestTemplates().map(({ prize, ...t }) => ({
+    matchId,
+    ...t,
+    entryFee: u.parse(t.entryFee),
+    sponsoredPool: u.parse(t.sponsoredPool),
+    platformFeeBps: 0,
+    prizeBps: prizeBps(prize, t.maxEntries),
+  }));
+  const funding = pools.reduce((a, p) => a + p.sponsoredPool, 0n);
+  await (await league.createContests(pools, { value: u.txValue(funding) })).wait();
   return { matchId, metadataURI };
 }
 

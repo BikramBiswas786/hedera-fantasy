@@ -33,6 +33,7 @@ describe("FantasyLeague", function () {
       maxEntriesPerUser: 3,
       platformFeeBps: 0,
       prizeBps: [6000, 3000, 1000],
+      name: "Test pool",
       ...overrides,
     };
     await league.createContest(params, { value: params.sponsoredPool });
@@ -189,9 +190,52 @@ describe("FantasyLeague", function () {
       await expect(league.connect(alice).joinContest(cId, ta.id, { value: E(11) })).to.be.revertedWith("Join: wrong entry fee");
       await expect(join(alice, cId, ta.id)).to.changeEtherBalances([alice, league], [-E(10), E(10)]);
 
-      const params = { matchId, entryFee: 0, sponsoredPool: E(5), maxEntries: 10, minEntries: 2, maxEntriesPerUser: 1, platformFeeBps: 0, prizeBps: [10000] };
+      const params = { matchId, entryFee: 0, sponsoredPool: E(5), maxEntries: 10, minEntries: 2, maxEntriesPerUser: 1, platformFeeBps: 0, prizeBps: [10000], name: "" };
       await expect(league.createContest(params)).to.be.revertedWith("Contest: send sponsored pool");
-      await expect(league.connect(alice).createContest(params, { value: E(5) })).to.be.reverted; // operators only
+    });
+
+    it("lets anyone create a pool, but only operators take a fee", async () => {
+      const duo = { matchId, entryFee: E(3), sponsoredPool: 0n, maxEntries: 2, minEntries: 2, maxEntriesPerUser: 1, platformFeeBps: 0, prizeBps: [10000], name: "Alice vs Bob" };
+      await expect(league.connect(alice).createContest(duo))
+        .to.emit(league, "ContestCreated")
+        .withArgs(await league.contestCount() + 1n, matchId, alice.address, "Alice vs Bob", E(3), 0, 2, [10000]);
+      const c = await league.getContest(await league.contestCount());
+      expect(c.sponsor).to.equal(alice.address);
+      expect(c.name).to.equal("Alice vs Bob");
+      await expect(league.connect(alice).createContest({ ...duo, platformFeeBps: 500 })).to.be.revertedWith("Contest: only operators take a fee");
+      await expect(league.connect(alice).createContest({ ...duo, maxEntries: 301, prizeBps: [10000] })).to.be.revertedWith("Contest: 2 to 300 entries");
+      await expect(league.connect(alice).createContest({ ...duo, name: "x".repeat(49) })).to.be.revertedWith("Contest: name too long");
+    });
+
+    it("creates several pools in one transaction", async () => {
+      const base = { matchId, entryFee: 0, maxEntries: 10, minEntries: 2, maxEntriesPerUser: 1, platformFeeBps: 0, prizeBps: [10000], name: "" };
+      const before = await league.contestCount();
+      await expect(league.createContests([{ ...base, sponsoredPool: E(1) }, { ...base, sponsoredPool: E(2) }], { value: E(2) })).to.be.revertedWith(
+        "Contest: send sponsored pool",
+      );
+      await league.createContests([{ ...base, sponsoredPool: E(1) }, { ...base, sponsoredPool: E(2) }], { value: E(3) });
+      expect(await league.contestCount()).to.equal(before + 2n);
+      expect((await league.getContest(before + 2n)).sponsoredPool).to.equal(E(2));
+    });
+
+    it("settles a full 300-entry pool with 150 different winners within Hedera's 15M gas limit", async function () {
+      this.timeout(900_000);
+      const { prizeBps } = await import("../scoring/prizes.mjs");
+      const cId = await contest(matchId, { entryFee: E(1), maxEntries: 300, maxEntriesPerUser: 1, prizeBps: prizeBps("top50pct", 300) });
+      // worst case: every entry, and so every winner, is a different player
+      const players = (await ethers.getSigners()).slice(10, 310);
+      for (const [k, user] of players.entries()) {
+        const t = autoPickTeam(meta.players, "cricket", k);
+        await league.connect(user).createTeam(matchId, t.picks, t.captain, t.viceCaptain);
+        await join(user, cId, await league.teamCount());
+      }
+      expect((await league.getEntries(cId)).length).to.equal(300);
+      await time.increase(7200);
+      await postResults(matchId, meta, stats);
+      await time.increase(DISPUTE);
+      const receipt = await (await league.settleContest(cId, await ranking(cId))).wait();
+      console.log(`      settle gas for 300 entries / 150 winners: ${receipt.gasUsed}`);
+      expect(receipt.gasUsed).to.be.lessThan(15_000_000n);
     });
 
     it("splits prizes between tied entries", async () => {

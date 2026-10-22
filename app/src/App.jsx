@@ -11,10 +11,17 @@ import {
   shortAddr,
   errorMessage,
 } from "./chain.js";
+import { matchLink } from "./data.js";
 import MatchList from "./components/MatchList.jsx";
 import MatchView from "./components/MatchView.jsx";
 
 const IS_LOCAL_HOST = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+/** Routes live in the URL hash so pools can be shared: #/match/12 or #/match/12/contest/40. */
+function parseHash() {
+  const m = /^#\/match\/(\d+)(?:\/contest\/(\d+))?/.exec(window.location.hash);
+  return m ? { page: "match", matchId: Number(m[1]), contestId: m[2] ? Number(m[2]) : null } : { page: "home" };
+}
 
 const defaultNetwork = () => {
   const saved = (() => {
@@ -35,7 +42,7 @@ export default function App() {
   const [balance, setBalance] = useState(0n);
   const [claimable, setClaimable] = useState(0n);
   const [chainOffset, setChainOffset] = useState(0); // chain time minus wall clock, in seconds
-  const [route, setRoute] = useState({ page: "home" });
+  const [route, setRoute] = useState(parseHash);
   const [toast, setToast] = useState(null);
   const [busy, setBusy] = useState(null);
   const [version, setVersion] = useState(0); // bump to reload data
@@ -46,6 +53,16 @@ export default function App() {
   const write = useMemo(() => (signer && deployed ? writeContracts(network, signer) : null), [network, signer, deployed]);
 
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
+
+  useEffect(() => {
+    const onHash = () => setRoute(parseHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const navigate = (hash) => {
+    window.location.hash = hash;
+    window.scrollTo(0, 0);
+  };
 
   useEffect(() => {
     if (!read) return;
@@ -62,7 +79,7 @@ export default function App() {
     setNetwork(n);
     setSigner(null);
     setAccount(null);
-    setRoute({ page: "home" });
+    navigate("");
   };
 
   const connect = async (choice) => {
@@ -104,7 +121,7 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <button className="brand" onClick={() => setRoute({ page: "home" })}>
+        <button className="brand" onClick={() => navigate("")}>
           <span className="logo">XI</span>
           <span>
             OpenXI
@@ -162,9 +179,9 @@ export default function App() {
             </p>
           </div>
         ) : route.page === "home" ? (
-          <MatchList ctx={ctx} open={(matchId) => setRoute({ page: "match", matchId })} />
+          <MatchList ctx={ctx} open={(matchId) => navigate(matchLink(matchId))} />
         ) : (
-          <MatchView ctx={ctx} matchId={route.matchId} back={() => setRoute({ page: "home" })} />
+          <MatchView ctx={ctx} matchId={route.matchId} invitedContest={route.contestId} back={() => navigate("")} />
         )}
       </main>
 

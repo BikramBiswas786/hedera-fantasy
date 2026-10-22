@@ -80,6 +80,16 @@ describe("CricketData feed", () => {
     expect(cricket.oversToBalls(4)).to.equal(24);
   });
 
+  it("covers internationals and major T20 leagues only", () => {
+    const m = (name, teams, matchType = "t20") => ({ name, teams, matchType });
+    expect(cricket.isCovered(m("India vs Australia, 1st T20I, Australia tour of India 2026", ["India", "Australia"]))).to.equal(true);
+    expect(cricket.isCovered(m("India vs Australia, 2nd ODI", ["India", "Australia"], "odi"))).to.equal(true);
+    expect(cricket.isCovered(m("Sydney Sixers Women vs Perth Scorchers Women, 5th Match, Women's Big Bash League 2026", ["Sydney Sixers Women", "Perth Scorchers Women"]))).to.equal(true);
+    expect(cricket.isCovered(m("Mumbai Indians vs Chennai Super Kings, 12th Match, Indian Premier League 2027", ["Mumbai Indians", "Chennai Super Kings"]))).to.equal(true);
+    expect(cricket.isCovered(m("Tamil Nadu vs Kerala, Elite Group B, Syed Mushtaq Ali Trophy 2026", ["Tamil Nadu", "Kerala"]))).to.equal(false);
+    expect(cricket.isCovered(m("Sixers vs Scorchers, 3rd Match, Big Bash League 2026", ["Sydney Sixers", "Perth Scorchers"], "odi"))).to.equal(false);
+  });
+
   it("credits catches, stumpings, run-outs and LBW/bowled to the fielding side", () => {
     const find = cricket.resolver(players);
     const out = {};

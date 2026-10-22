@@ -823,3 +823,58 @@ table.board {
 .verify .board td.tiny-text {
   min-width: 220px;
 }
+
+/* Pools */
+.pool-bar {
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.pool-bar .tabs {
+  margin: 0;
+}
+
+.contest-name {
+  font-weight: 700;
+}
+
+.contest.invited {
+  border: 2px solid var(--brand-2);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.field input,
+.field select {
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chips .tab {
+  margin: 0;
+}
+
+.preview {
+  background: var(--surface-2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}

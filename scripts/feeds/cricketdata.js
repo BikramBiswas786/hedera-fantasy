@@ -1,4 +1,4 @@
-// International T20 and ODI matches, squads and scorecards from CricketData.org
+// International T20 and ODI matches, plus major T20 leagues, with squads and scorecards from CricketData.org
 // (api.cricapi.com). Needs a free API key in CRICKETDATA_API_KEY; the free plan allows
 // 100 requests a day, so callers should list matches sparingly.
 const BASE = "https://api.cricapi.com/v1";
@@ -9,12 +9,19 @@ const NATIONS = new Set([
   "United Arab Emirates", "UAE", "United States of America", "USA", "Canada", "Papua New Guinea", "Uganda",
   "Hong Kong", "Kenya",
 ]);
+// Franchise leagues, matched against the series part of the match name.
+const LEAGUES =
+  /Indian Premier League|\bIPL\b|Big Bash|\bWBBL\b|Pakistan Super League|\bPSL\b|Caribbean Premier League|\bCPL\b|\bSA20\b|The Hundred|International League T20|\bILT20\b|Major League Cricket|Super Smash|Vitality Blast|T20 Blast|Lanka Premier League|Bangladesh Premier League|Women'?s Premier League|\bWPL\b/i;
+
 const MATCH_TYPES = { t20: { rulesId: "cricket-t20-v1", label: "T20I", hours: 3.5 }, odi: { rulesId: "cricket-odi-v1", label: "ODI", hours: 8 } };
 const ROLE_CREDITS = [85, 85, 90, 80]; // WK, BAT, AR, BOWL (tenths); the feed has no player ratings
 
 const gmtUnix = (s) => Math.floor(Date.parse(/[zZ]|[+-]\d\d:?\d\d$/.test(s) ? s : `${s}Z`) / 1000);
 const nationOf = (team) => team.replace(/\s+Women$/i, "").trim();
 const isInternational = (teams) => Array.isArray(teams) && teams.length === 2 && teams.every((t) => NATIONS.has(nationOf(t)));
+const seriesOf = (name = "") => name.split(",").pop().trim();
+/** Internationals (T20I/ODI) and T20 matches in a major league. */
+const isCovered = (m) => isInternational(m.teams) || (m.matchType === "t20" && LEAGUES.test(seriesOf(m.name)));
 
 function roleOf(role = "") {
   const r = role.toLowerCase();
@@ -28,6 +35,7 @@ function roleOf(role = "") {
 function buildMeta(match, squads) {
   const type = MATCH_TYPES[match.matchType];
   const women = match.teams.some((t) => /women$/i.test(t));
+  const international = isInternational(match.teams);
   const players = [];
   match.teams.forEach((teamName, side) => {
     const squad = squads.find((s) => s.teamName === teamName) || squads[side];
@@ -40,7 +48,7 @@ function buildMeta(match, squads) {
   return {
     sport: "cricket",
     rulesId: type.rulesId,
-    competition: `${type.label}${women ? " (Women)" : ""}`,
+    competition: international ? `${type.label}${women ? " (Women)" : ""}` : seriesOf(match.name),
     name: match.name || `${match.teams[0]} vs ${match.teams[1]}`,
     teams: match.teams,
     short: match.teams.map((t) => info(t)?.shortname || nationOf(t).slice(0, 3).toUpperCase()),
@@ -152,14 +160,14 @@ function createCricketFeed({ apiKey, fetchImpl = fetch, log = console.log } = {}
     provider: "cricketdata",
     requests: () => requests,
 
-    /** International T20/ODI matches starting between `from` and `to` (unix seconds). */
+    /** Covered matches starting between `from` and `to` (unix seconds). */
     async upcoming(from, to) {
       const out = [];
-      for (let offset = 0; offset < 75; offset += 25) {
+      for (let offset = 0; offset < 125; offset += 25) {
         const { data = [] } = await get("/matches", { offset });
         for (const m of data) {
           const start = m.dateTimeGMT ? gmtUnix(m.dateTimeGMT) : 0;
-          if (!MATCH_TYPES[m.matchType] || m.matchStarted || !isInternational(m.teams) || start <= from || start > to) continue;
+          if (!MATCH_TYPES[m.matchType] || m.matchStarted || !isCovered(m) || start <= from || start > to) continue;
           const { data: squads = [] } = await get("/match_squad", { id: m.id });
           const meta = buildMeta(m, squads);
           if (meta.players.length < 22) {
@@ -187,4 +195,4 @@ function createCricketFeed({ apiKey, fetchImpl = fetch, log = console.log } = {}
   };
 }
 
-module.exports = { createCricketFeed, buildMeta, statsFromScorecard, creditDismissal, resolver, roleOf, isInternational, oversToBalls };
+module.exports = { createCricketFeed, buildMeta, statsFromScorecard, creditDismissal, resolver, roleOf, isInternational, isCovered, oversToBalls };
