@@ -40,26 +40,39 @@ jobs:
           key: sync-cache-${{ github.run_id }}
           restore-keys: sync-cache-
       - name: Sync
-        # Hashio often answers the chain-id call with HTTP 502. That is not a bad sync.
-        # Retry twice. A scheduled run that still cannot reach the RPC exits 0 so it does not mail a failure.
-        # A manual run still fails, so a real script error is visible from the Actions tab.
+        # Hashio (https://testnet.hashio.io/api) is the free public relay and often answers
+        # the chain-id call with HTTP 502. thirdweb publishes the other keyless testnet relay.
+        # Use the first one that returns chain id 296 (0x128). Do not hide a real script error.
         run: |
           set +e
-          attempt=1
-          while [ "$attempt" -le 3 ]; do
-            npx hardhat run scripts/sync.js --network hederaTestnet
+          probe() {
+            curl -sf --max-time 20 -H 'content-type: application/json' \
+              -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' "$1" \
+              | grep -Eq '"result"[[:space:]]*:[[:space:]]*"0x128"'
+          }
+          code=1
+          for url in https://testnet.hashio.io/api https://296.rpc.thirdweb.com; do
+            ready=1
+            for try in 1 2 3; do
+              if probe "$url"; then
+                ready=0
+                break
+              fi
+              echo "$url did not return chain id 296 (try ${try})"
+              sleep 15
+            done
+            if [ "$ready" -ne 0 ]; then
+              continue
+            fi
+            echo "Sync via ${url}"
+            HEDERA_RPC_URL="$url" npx hardhat run scripts/sync.js --network hederaTestnet
             code=$?
             if [ "$code" -eq 0 ]; then
               exit 0
             fi
-            echo "sync attempt ${attempt} exited ${code}"
-            attempt=$((attempt + 1))
-            sleep 20
+            echo "sync via ${url} exited ${code}"
           done
-          if [ "${{ github.event_name }}" = "schedule" ]; then
-            echo "::warning::Hashio was unreachable after 3 attempts. Skipping this hour."
-            exit 0
-          fi
+          echo "::error::No Hedera testnet relay completed the sync (last exit ${code})."
           exit "$code"
         env:
           HEDERA_ACCOUNT_ID: ${{ secrets.HEDERA_ACCOUNT_ID }}
